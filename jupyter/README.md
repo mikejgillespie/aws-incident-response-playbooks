@@ -61,7 +61,7 @@ Double click on the configure-notebook-server.ipynb and follow the instructions.
 
 **TODO: The notebook server can be automated to automatically run a notebook. We can configure the notebook to load the notebook and execute it, automated these two steps.**
 
-From this point, any notebook that starts with will initiate the 
+From this point, any notebook that starts with will initiate the SSO login.
 ```
 import jupyter_aws_sso
 jupyter_aws_sso.login(role, aws_account)
