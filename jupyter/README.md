@@ -66,3 +66,9 @@ From this point, any notebook that starts with will initiate the SSO login.
 import jupyter_aws_sso
 jupyter_aws_sso.login(role, aws_account)
 ```
+
+### Local
+
+#### Mac
+
+#### Windows
