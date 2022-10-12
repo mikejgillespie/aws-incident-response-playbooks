@@ -1,0 +1,67 @@
+Description: "Create basic notebook instance"
+Description: >-
+  Creates a SageMaker Jupyter runbook configured to run against SSO.
+  
+Resources:
+  BasicNotebookInstance:
+    Type: "AWS::SageMaker::NotebookInstance"
+    Properties:
+      InstanceType: "ml.t2.large"
+      RoleArn: !GetAtt ExecutionRole.Arn
+  ExecutionRole: 
+    Type: "AWS::IAM::Role"
+    Properties: 
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+        - 
+          Effect: "Allow"
+          Principal: 
+            Service: 
+              - "sagemaker.amazonaws.com"
+          Action: 
+          - "sts:AssumeRole"
+      Path: "/"
+      Policies: 
+        - 
+          PolicyName: "List-SSO-PermissionSets-Accounts"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - Effect: "Allow"
+                Action: 
+                  - "sso:ListPermissionSets"
+                  - "sso:ListAccountsForProvisionedPermissionSet"
+                  - "sso:DescribePermissionSet"
+                Resource: 
+                - '*'
+        - 
+          PolicyName: "parameter-store-policy"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - Effect: "Allow"
+                Action: 
+                  - "ssm:GetParameter"
+                Resource: 
+                - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/Jupyter-SSO-Directory
+                - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/Jupyter-SSO-Portal-Url
+                - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/Jupyter-SSO-Instance-Arn
+                - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/Jupyter-S3
+        - 
+          PolicyName: "sagemaker-notebook-policy"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - Effect: "Allow"
+                Action: 
+                  - "s3:GetObject"
+                  - "s3:PutObject"
+                  - "s3:ListBucket"
+                Resource: 
+                - 'arn:aws:s3:::{{resolve:ssm:Jupyter-S3}}'
+                - 'arn:aws:s3:::{{resolve:ssm:Jupyter-S3}}/*'
+Outputs:
+  BasicNotebookInstanceId:
+    Value: !Ref BasicNotebookInstance
+    Value: !GetAtt BasicNotebookInstance.NotebookInstanceName

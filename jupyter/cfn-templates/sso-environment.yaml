@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  Configures the SSO for the Jupyter runbooks
+Parameters:
+  SsoInstanceArn:
+    Description: The arn of the SSO instance
+    Type: String
+  SsoDirectory:
+    Description: The name of the sso instance
+    Type: String
+  SsoPortalUrl:
+    Description: The portal url of the sso instance
+    Type: String
+Resources:
+  SsoInstanceArnParameter:
+    Type: AWS::SSM::Parameter
+    Properties: 
+      Description: This contains the SSO Directory ID for this account
+      Type: String
+      Name: Jupyter-SSO-Instance-Arn
+      Value: !Ref SsoInstanceArn  
+  SsoDirectoryParameter:
+    Type: AWS::SSM::Parameter
+    Properties: 
+      Description: This contains the SSO Directory ID for this account
+      Type: String
+      Name: Jupyter-SSO-Directory
+      Value: !Ref SsoDirectory
+  SsoPortalUrlParameter:
+    Type: AWS::SSM::Parameter
+    Properties: 
+      Description: This contains the SSO Directory Url for this account
+      Type: String
+      Name: Jupyter-SSO-Portal-Url
+      Value: !Ref SsoPortalUrl
+  JupiterNotebookS3Parameter:
+    Type: AWS::SSM::Parameter
+    Properties: 
+      Description: This contains the SSO Directory Url for this account
+      Type: String
+      Name: Jupyter-S3
+      Value: !Ref notebookS3Bucket
+  notebookS3Bucket:
+     Type: AWS::S3::Bucket
+     Properties:
+       BucketEncryption: 
+        ServerSideEncryptionConfiguration: 
+        - ServerSideEncryptionByDefault:
+            SSEAlgorithm: AES256
+  ViewOnlyPermissionSet:
+    Type: AWS::SSO::PermissionSet
+    Properties: 
+      Description: Read-only permissions for Jupyter incident response notebooks
+      InstanceArn: !Ref SsoInstanceArn
+      ManagedPolicies: 
+        - arn:aws:iam::aws:policy/job-function/ViewOnlyAccess
+      Name: Jupyter-IR-ViewOnly
+      SessionDuration: PT2H
+  SysAdminPermissionSet:
+    Type: AWS::SSO::PermissionSet
+    Properties: 
+      Description: SysAdmin permissions for Jupyter incident response notebooks
+      InstanceArn: !Ref SsoInstanceArn
+      ManagedPolicies: 
+        - arn:aws:iam::aws:policy/job-function/SystemAdministrator
+      Name: Jupyter-IR-SysAdminAccess
+      SessionDuration: PT2H
+  AdministratorPermissionSet:
+    Type: AWS::SSO::PermissionSet
+    Properties: 
+      Description: Administrator permissions for Jupyter incident response notebooks
+      InstanceArn: !Ref SsoInstanceArn
+      ManagedPolicies: 
+        - arn:aws:iam::aws:policy/AdministratorAccess
+      Name: Jupyter-IR-AdministratorAccess
+      SessionDuration: PT2H
+
+Outputs:
+  NotebookS3Bucket:
+    Value: !Ref notebookS3Bucket
