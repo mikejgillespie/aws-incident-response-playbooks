@@ -54,6 +54,8 @@ A cloudformation template is included in this repo to create a Jupyter notebook 
 aws cloudformation deploy --stack-name sso-jupyter --capabilities CAPABILITY_IAM --template-file jupyter-notebook-instance.yaml
 ```
 
+Skip ahead to **Configuring The Jupyter Lab Server**
+
 ### Local
 The machine will need access to the [AWS CLI 2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html), and the default profile has access to the management account of IAM Identity Center.
 
