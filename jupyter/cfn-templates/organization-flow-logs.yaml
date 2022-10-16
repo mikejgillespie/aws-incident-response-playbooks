@@ -1,0 +1,147 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Creates the flow logs Athena table
+Parameters:
+  DatabaseName:
+    Type: String
+    Description: The database name for the Athena tables
+  FlowLogsBucket:
+    Type: String
+    Description: The Name of the S3 bucket that contains the CloudTrail logs.
+Conditions:
+  CreateBucket: !Equals 
+    - !Ref FlowLogsBucket
+    - ''
+Resources:
+  FlowLogBucket:
+    Type: 'AWS::S3::Bucket'
+    Condition: CreateBucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  FlowLogBucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Condition: CreateBucket
+    Properties:
+      Bucket: !Ref FlowLogBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: AWSCloudTrailAclCheck
+          Effect: Allow
+          Principal:
+            Service:
+            - 'cloudtrail.amazonaws.com'
+            - 'delivery.logs.amazonaws.com'
+            - 'config.amazonaws.com'
+          Action: 's3:GetBucketAcl'
+          Resource: !Sub 'arn:aws:s3:::${FlowLogBucket}'
+        - Sid: AWSCloudTrailWrite
+          Effect: Allow
+          Principal:
+            Service:
+            - 'cloudtrail.amazonaws.com'
+            - 'delivery.logs.amazonaws.com'
+            - 'config.amazonaws.com'
+          Action: 's3:PutObject'
+          Resource: [
+            !Sub 'arn:aws:s3:::${FlowLogBucket}/AWSLogs/*'
+          ]
+          Condition:
+            StringEquals:
+              's3:x-amz-acl': 'bucket-owner-full-control'
+  CFNTableFlowLogs:
+    # Creating the table waits for the database to be created
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref DatabaseName
+      TableInput:
+        Name: vpc_flow_logs
+        Description: The organization wide vpc flow logs
+        TableType: EXTERNAL_TABLE
+        Parameters:
+          "projection.enabled": "true"
+          "projection.enabled": "true" 
+          "storage.location.template":  !If 
+            - CreateBucket
+            - !Sub s3://${FlowLogBucket}/AWSLogs/o-krcf45heml/${!accountid}/CloudTrail/${!region}/${!timestamp}/
+            - !Sub s3://${FlowLogsBucket}/AWSLogs/o-krcf45heml/${!accountid}/CloudTrail/${!region}/${!timestamp}/
+          "projection.accountid.type": "injected"
+          "projection.region.type": "enum"
+          "projection.region.values": "us-east-1,us-east-2,us-west-1,us-west-2"
+          "projection.timestamp.format": "yyyy/MM/dd/HH"
+          "projection.timestamp.interval": "1"
+          "projection.timestamp.interval.unit": "HOURS"
+          "projection.timestamp.range": "2020/01/01/01,NOW"
+          "projection.timestamp.type": "date"
+        PartitionKeys:
+        # Data is partitioned by month
+        - Name: accountid
+          Type: string
+        - Name: region
+          Type: string
+        - Name: timestamp
+          Type: string                       
+        StorageDescriptor:
+          Columns:
+            - Name: version
+              Type: int
+              Comment: ''
+            - Name: account_id
+              Type: string
+              Comment: ''
+            - Name: interface_id
+              Type: string
+              Comment: ''
+            - Name: srcaddr
+              Type: string
+              Comment: ''
+            - Name: dstaddr
+              Type: string
+              Comment: ''
+            - Name: srcport
+              Type: int
+              Comment: ''
+            - Name: dstport
+              Type: int
+              Comment: ''
+            - Name: protocol
+              Type: bigint
+              Comment: ''
+            - Name: packets
+              Type: bigint
+              Comment: ''
+            - Name: bytes
+              Type: bigint
+              Comment: ''
+            - Name: start
+              Type: bigint
+              Comment: ''
+            - Name: end
+              Type: bigint
+              Comment: ''
+            - Name: action
+              Type: string
+              Comment: ''
+            - Name: log_status
+              Type: string
+              Comment: ''
+          Location: !If 
+            - CreateBucket
+            - !Sub s3://${FlowLogBucket}/AWSLogs/${AWS::AccountId}/vpcflowlogs/
+            - !Sub s3://${FlowLogsBucket}/AWSLogs/${AWS::AccountId}/vpcflowlogs/
+          InputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat
+          Compressed: false
+          SerdeInfo:
+            SerializationLibrary: org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe
+            Parameters:
+              "serialization.format": '1'
+          StoredAsSubDirectories: false
+
+Outputs:
+    BucketName:
+      Value: !If [CreateBucket, !Ref FlowLogBucket, !Ref FlowLogsBucket]

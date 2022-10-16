@@ -44,10 +44,7 @@ Resources:
                 Action: 
                   - "ssm:GetParameter"
                 Resource: 
-                - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/Jupyter-SSO-Directory
-                - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/Jupyter-SSO-Portal-Url
-                - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/Jupyter-SSO-Instance-Arn
-                - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/Jupyter-S3
+                - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/Jupyter-*
         - 
           PolicyName: "sagemaker-notebook-policy"
           PolicyDocument: 

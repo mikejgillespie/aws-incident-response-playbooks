@@ -40,6 +40,20 @@ Resources:
       Type: String
       Name: Jupyter-S3
       Value: !Ref notebookS3Bucket
+  ManagementRegion:
+    Type: AWS::SSM::Parameter
+    Properties: 
+      Description: This contains the management region
+      Type: String
+      Name: Jupyter-Management-Region
+      Value: !Ref AWS::Region
+  ManagementAccount:
+    Type: AWS::SSM::Parameter
+    Properties: 
+      Description: This contains the management account
+      Type: String
+      Name: Jupyter-Management-Account
+      Value: !Ref AWS::AccountId
   notebookS3Bucket:
      Type: AWS::S3::Bucket
      Properties:
@@ -54,6 +68,7 @@ Resources:
       InstanceArn: !Ref SsoInstanceArn
       ManagedPolicies: 
         - arn:aws:iam::aws:policy/job-function/ViewOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonAthenaFullAccess
       Name: Jupyter-IR-ViewOnly
       SessionDuration: PT2H
   SysAdminPermissionSet:
