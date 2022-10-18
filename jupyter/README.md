@@ -111,6 +111,8 @@ pip install jupyterlab boto3
 
 ### Configuring The Jupyter Lab Server
 
+Enter into the jupyter folder of this repository - it should be loaded in the jupyter file navigator.
+
 Double click on the configure-notebook-server.ipynb and follow the instructions. This setup only needs to be done one time.
 
 **Enhancement: The notebook server can be automated to automatically run a notebook. We can configure the notebook to load the notebook and execute it, skipping these two manual steps.**
