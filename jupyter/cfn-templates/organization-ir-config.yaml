@@ -1,0 +1,74 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Creates the flow logs Athena table
+Parameters:
+  FlowLogsBucket:
+    Type: String
+    Description: The Name of the S3 bucket that contains the CloudTrail logs.
+  AutomateRemediationTemplateUrl:
+    Type: String
+    Description: The URL of the S3 location that contains the auto remediation stack.
+  RegionList:
+    Type: String
+  OrgUnitId:
+    Type: String
+  OutputFormat:
+    Type: String
+    Default: plain-text
+Resources:
+  AccountLevelStackSet:
+    Type: AWS::CloudFormation::StackSet
+    Properties: 
+      AutoDeployment:
+        Enabled: true
+        RetainStacksOnAccountRemoval: false
+      Capabilities: 
+        - CAPABILITY_NAMED_IAM
+      Description: Stackset to deploy to reach region in the account
+      PermissionModel: SERVICE_MANAGED
+      StackInstancesGroup:
+      - DeploymentTargets: 
+          OrganizationalUnitIds:
+            - !Ref OrgUnitId
+        Regions:
+          - us-east-1
+      Parameters: 
+        - ParameterKey: ConfigRemediationRoleName
+          ParameterValue: !Sub ${AWS::StackName}-config-remediation
+      StackSetName: !Sub ${AWS::StackName}-account
+      TemplateURL: !Sub ${AutomateRemediationTemplateUrl}/account-configurations.yaml
+  RegionLevelStackSet:
+    Type: AWS::CloudFormation::StackSet
+    DependsOn: AccountLevelStackSet
+    Properties: 
+      AutoDeployment:
+        Enabled: true
+        RetainStacksOnAccountRemoval: false
+      Capabilities: 
+        - CAPABILITY_IAM
+      Description: Stackset to deploy to reach region in the account
+      Parameters: 
+        - CustomConfigRuleName
+      PermissionModel: SERVICE_MANAGED
+      StackInstancesGroup:
+      - DeploymentTargets: 
+          OrganizationalUnitIds:
+            - !Ref OrgUnitId
+        Regions: !Split [",", !Ref RegionList]
+      Parameters: 
+        - ParameterKey: CustomConfigRuleName
+          ParameterValue: ConfigRuleForEnableVpcFlowLogs
+        - ParameterKey: OutputFormat
+          ParameterValue: !Ref OutputFormat
+        - ParameterKey: TrafficType
+          ParameterValue: ALL
+        - ParameterKey: MaxExecutionFrequency
+          ParameterValue: One_Hour
+        - ParameterKey: CentralizedS3LoggingBucket
+          ParameterValue: !Ref FlowLogsBucket   
+        - ParameterKey: ConfigRemediationRole
+          ParameterValue: !Sub ${AWS::StackName}-config-remediation
+      StackSetName: !Sub ${AWS::StackName}-regions
+      TemplateURL: !Sub ${AutomateRemediationTemplateUrl}/region-account-configurations.yaml
+Outputs:
+    FlowLogsBucket:
+      Value: !Ref FlowLogsBucket

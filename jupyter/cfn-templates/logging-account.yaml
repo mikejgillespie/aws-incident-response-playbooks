@@ -1,0 +1,410 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Creates the flow logs Athena table
+Parameters:
+  DatabaseName:
+    Type: String
+    Description: The database name for the Athena tables
+  CloudTrailLogsBucket:
+    Type: String
+    Description: The Name of the S3 bucket that contains the CloudTrail logs.
+  FlowLogsBucket:
+    Type: String
+    Description: The Name of the S3 bucket that contains the CloudTrail logs.
+  OrgId:
+    Type: String
+    Description: The ID of the AWS Organization
+  CloudTrailTableName:
+    Type: String
+    Description: The table name for the Athena CloudTrail tables
+  FlowLogsFormat:
+    Type: String
+  RegionList:
+    Type: String
+Conditions:
+  CreateBucket: !Equals 
+    - !Ref FlowLogsBucket
+    - ''
+  CreateCloudTrailBucket: !Equals 
+    - !Ref CloudTrailLogsBucket
+    - ''
+  FlowLogsParquet: !Equals 
+    - !Ref FlowLogsFormat
+    - 'parquet'
+Resources:
+  CfnBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  CfnBucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket: !Ref CfnBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: AWSCloudFormation
+          Effect: Allow
+          Principal:
+            "Service": 
+              - "cloudformation.amazonaws.com"
+          Action:
+          - 's3:ListBucket'
+          Resource: 
+          - !Sub 'arn:aws:s3:::${CfnBucket}'
+        - Sid: AWSCloudFormation2
+          Effect: Allow
+          Principal:
+            "Service": 
+              - "cloudformation.amazonaws.com"
+          Action:
+          - 's3:GetObject'
+          Resource: 
+          - !Sub 'arn:aws:s3:::${CfnBucket}/*'
+        - Sid: GetObjectOrganization
+          Effect: Allow
+          Principal:
+            AWS:
+            - '*'
+          Action:
+          - 's3:ListBucket'
+          Resource: 
+          - !Sub 'arn:aws:s3:::${CfnBucket}'
+          Condition:
+            StringEquals:
+              "aws:PrincipalOrgID": !Ref OrgId
+        - Sid: GetObjectOrganization2
+          Effect: Allow
+          Principal:
+            AWS:
+            - '*'
+          Action:
+          - 's3:GetObject'
+          Resource: 
+          - !Sub 'arn:aws:s3:::${CfnBucket}/*'
+          Condition:
+            StringEquals:
+              "aws:PrincipalOrgID": !Ref OrgId
+  CFNDatabaseAuditLogs:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Ref DatabaseName 
+        Description: Database to hold tables for CloudTrail data
+  FlowLogBucket:
+    Type: 'AWS::S3::Bucket'
+    Condition: CreateBucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  CfnCloudTrailLogsBucket:
+    Type: 'AWS::S3::Bucket'
+    Condition: CreateCloudTrailBucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  CfnCloudTrailLogsPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Condition: CreateCloudTrailBucket
+    Properties:
+      Bucket: !Ref CfnCloudTrailLogsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: AWSCloudTrailAclCheck
+          Effect: Allow
+          Principal:
+            Service:
+            - 'cloudtrail.amazonaws.com'
+            - 'delivery.logs.amazonaws.com'
+            - 'config.amazonaws.com'
+          Action: 's3:GetBucketAcl'
+          Resource: !Sub 'arn:aws:s3:::${CfnCloudTrailLogsBucket}'
+        - Sid: AWSCloudTrailWrite
+          Effect: Allow
+          Principal:
+            Service:
+            - 'cloudtrail.amazonaws.com'
+            - 'delivery.logs.amazonaws.com'
+            - 'config.amazonaws.com'
+          Action: 's3:PutObject'
+          Resource: [
+            !Sub 'arn:aws:s3:::${CfnCloudTrailLogsBucket}/AWSLogs/*'
+          ]
+          Condition:
+            StringEquals:
+              's3:x-amz-acl': 'bucket-owner-full-control'
+  FlowLogBucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Condition: CreateBucket
+    Properties:
+      Bucket: !Ref FlowLogBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: AWSCloudTrailAclCheck
+          Effect: Allow
+          Principal:
+            Service:
+            - 'cloudtrail.amazonaws.com'
+            - 'delivery.logs.amazonaws.com'
+            - 'config.amazonaws.com'
+          Action: 's3:GetBucketAcl'
+          Resource: !Sub 'arn:aws:s3:::${FlowLogBucket}'
+        - Sid: AWSCloudTrailWrite
+          Effect: Allow
+          Principal:
+            Service:
+            - 'cloudtrail.amazonaws.com'
+            - 'delivery.logs.amazonaws.com'
+            - 'config.amazonaws.com'
+          Action: 's3:PutObject'
+          Resource: [
+            !Sub 'arn:aws:s3:::${FlowLogBucket}/AWSLogs/*'
+          ]
+          Condition:
+            StringEquals:
+              's3:x-amz-acl': 'bucket-owner-full-control'
+  CFNTableFlowLogs:
+    # Creating the table waits for the database to be created
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref DatabaseName
+      TableInput:
+        Name: vpc_flow_logs
+        Description: The organization wide vpc flow logs
+        TableType: EXTERNAL_TABLE
+        Parameters:
+          "projection.enabled": "true"
+          "projection.enabled": "true" 
+          "storage.location.template":  !If 
+            - CreateBucket
+            - !Sub s3://${FlowLogBucket}/AWSLogs/${!accountid}/vpcflowlogs/${!region}/${!timestamp}/
+            - !Sub s3://${FlowLogsBucket}/AWSLogs/${!accountid}/vpcflowlogs/${!region}/${!timestamp}/
+          "projection.accountid.type": "injected"
+          "projection.region.type": "enum"
+          "projection.region.values": !Ref RegionList
+          "projection.timestamp.format": "yyyy/MM/dd"
+          "projection.timestamp.interval": "1"
+          "projection.timestamp.interval.unit": "DAYS"
+          "projection.timestamp.range": "2020/01/01,NOW"
+          "projection.timestamp.type": "date"
+          "skip.header.line.count": !If
+            - FlowLogsParquet
+            - !Ref AWS::NoValue
+            - '1'
+        PartitionKeys:
+        # Data is partitioned by month
+        - Name: accountid
+          Type: string
+        - Name: region
+          Type: string
+        - Name: timestamp
+          Type: string                       
+        StorageDescriptor:
+          Columns:
+            - Name: version
+              Type: int
+              Comment: ''
+            - Name: account_id
+              Type: string
+              Comment: ''
+            - Name: interface_id
+              Type: string
+              Comment: ''
+            - Name: srcaddr
+              Type: string
+              Comment: ''
+            - Name: dstaddr
+              Type: string
+              Comment: ''
+            - Name: srcport
+              Type: int
+              Comment: ''
+            - Name: dstport
+              Type: int
+              Comment: ''
+            - Name: protocol
+              Type: bigint
+              Comment: ''
+            - Name: packets
+              Type: bigint
+              Comment: ''
+            - Name: bytes
+              Type: bigint
+              Comment: ''
+            - Name: start
+              Type: bigint
+              Comment: ''
+            - Name: end
+              Type: bigint
+              Comment: ''
+            - Name: action
+              Type: string
+              Comment: ''
+            - Name: log_status
+              Type: string
+              Comment: ''
+          Location: !If 
+            - CreateBucket
+            - !Sub s3://${FlowLogBucket}/AWSLogs/
+            - !Sub s3://${FlowLogsBucket}/AWSLogs/
+          InputFormat: !If
+          - FlowLogsParquet
+          - 'org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat'
+          - 'org.apache.hadoop.mapred.TextInputFormat'
+          OutputFormat: !If
+          - FlowLogsParquet
+          - 'org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat'
+          - 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
+          Compressed: false
+          SerdeInfo:
+            SerializationLibrary:  !If
+              - FlowLogsParquet
+              - 'org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe'
+              - 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe'            
+            Parameters:
+              "serialization.format":  !If
+                - FlowLogsParquet
+                - '1'
+                - ' '
+              "field.delim": !If
+                - FlowLogsParquet
+                - !Ref AWS::NoValue
+                - ' '
+          StoredAsSubDirectories: false
+  CFNTableCloudTrail:
+    DependsOn: CFNDatabaseAuditLogs
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref DatabaseName
+      TableInput:
+        Name: !Ref CloudTrailTableName
+        Description: The organization wide cloudtrail logs
+        TableType: EXTERNAL_TABLE
+        Parameters:
+          "projection.enabled": "true"
+          "projection.enabled": "true" 
+          "storage.location.template":  !If 
+            - CreateCloudTrailBucket
+            - !Sub s3://${CfnCloudTrailLogsBucket}/AWSLogs/${OrgId}/${!accountid}/CloudTrail/${!region}/${!timestamp}/
+            - !Sub s3://${CloudTrailLogsBucket}/AWSLogs/${OrgId}/${!accountid}/CloudTrail/${!region}/${!timestamp}/
+          "projection.accountid.type": "injected"
+          "projection.region.type": "enum"
+          "projection.region.values": !Ref RegionList
+          "projection.timestamp.format": "yyyy/MM/dd"
+          "projection.timestamp.interval": "1"
+          "projection.timestamp.interval.unit": "DAYS"
+          "projection.timestamp.range": "2020/01/01,NOW"
+          "projection.timestamp.type": "date"
+        PartitionKeys:
+        # Data is partitioned by month
+        - Name: accountid
+          Type: string
+        - Name: region
+          Type: string
+        - Name: timestamp
+          Type: string                    
+        StorageDescriptor:
+          Columns:
+            - Name: eventversion
+              Type: string
+              Comment: ''
+            - Name: useridentity
+              Type: struct<Type:string,principalid:string,arn:string,accountid:string,invokedby:string,accesskeyid:string,userName:string,sessioncontext:struct<attributes:struct<mfaauthenticated:string,creationdate:string>,sessionissuer:struct<Type:string,principalId:string,arn:string,accountId:string,userName:string>>>
+              Comment: ''
+            - Name: eventtime
+              Type: string
+              Comment: ''
+            - Name: eventsource
+              Type: string
+              Comment: ''
+            - Name: eventName
+              Type: string
+              Comment: ''
+            - Name: awsregion
+              Type: string
+              Comment: ''
+            - Name: sourceipaddress
+              Type: string
+              Comment: ''
+            - Name: useragent
+              Type: string
+              Comment: ''
+            - Name: errorcode
+              Type: string
+              Comment: ''
+            - Name: errormessage
+              Type: string
+              Comment: ''
+            - Name: requestparameters
+              Type: string
+              Comment: ''
+            - Name: responseelements
+              Type: string
+              Comment: ''
+            - Name: additionaleventdata
+              Type: string
+              Comment: ''
+            - Name: requestid
+              Type: string
+              Comment: ''
+            - Name: eventid
+              Type: string
+              Comment: ''
+            - Name: resources
+              Type: array<struct<ARN:string,accountId:string,Type:string>>
+              Comment: ''
+            - Name: eventType
+              Type: string
+              Comment: ''
+            - Name: apiversion
+              Type: string
+              Comment: ''
+            - Name: readonly
+              Type: string
+              Comment: ''
+            - Name: recipientaccountid
+              Type: string
+              Comment: ''
+            - Name: serviceeventdetails
+              Type: string
+              Comment: ''
+            - Name: sharedeventid
+              Type: string
+              Comment: ''
+            - Name: vpcendpointid
+              Type: string
+              Comment: ''
+          Location: !Sub s3://${TrailBucket}/AWSLogs/${AWS::AccountId}/CloudTrail/
+          Location: !If 
+            - CreateCloudTrailBucket
+            - !Sub s3://${CfnCloudTrailLogsBucket}/AWSLogs/${OrgId}/CloudTrail/
+            - !Sub s3://${CloudTrailLogsBucket}/AWSLogs/${OrgId}/CloudTrail/
+          InputFormat: com.amazon.emr.cloudtrail.CloudTrailInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Compressed: false
+          SerdeInfo:
+            SerializationLibrary: com.amazon.emr.hive.serde.CloudTrailSerde
+            Parameters:
+              serialization.format: '1'
+          StoredAsSubDirectories: false
+Outputs:
+    CfnBucket:
+      Value: !Ref CfnBucket
+    BucketName:
+      Value: !If [CreateBucket, !Ref FlowLogBucket, !Ref FlowLogsBucket]
+    CloudTrailLogsBucket:
+      Value: !If [CreateCloudTrailBucket, !Ref CfnCloudTrailLogsBucket, !Ref CloudTrailLogsBucket]
