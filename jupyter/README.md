@@ -7,6 +7,10 @@ The notebooks included in this repository combine automation in the form of pyth
 * **SSO Authentication**: This solution uses IAM Identity Center for authentication of users. This eliminates the need to grant bread access to the notebook server and permissions within a notebook can be scoped down to what is needed for the response.
 * **Notebook Server** The notebooks in this repositiry can use either SageMaker Notebooks or local Jupyter notebooks. A CloudFormation template is included to create a SageMaker Notebook server with the proper permissions.
 
+# Prerequisites
+This project assumes the accounts are organized with AWS organizations and authentication is managed by AWS Identity Center (Formerly SSO).
+
+
 # Installation
 First, clone the repo so you have a local copy.
 
