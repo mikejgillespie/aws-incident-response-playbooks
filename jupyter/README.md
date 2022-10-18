@@ -122,3 +122,5 @@ From this point, any notebook that starts with will these two lines of code will
 import jupyter_aws_sso
 jupyter_aws_sso.login(role, aws_account)
 ```
+
+Lastly, baseline your AWS organization be executing the [configure-aws-organization](configure-aws-organization.ipynb) notebook.
