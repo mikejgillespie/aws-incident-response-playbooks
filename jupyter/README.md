@@ -71,10 +71,7 @@ Identity Center Permissions
 
 SSM Permissions:
 The notebook server will need `GetParameter` permissions on the following SSM Parameters:
-* Jupyter-SSO-Directory
-* Jupyter-SSO-Portal-Url
-* Jupyter-SSO-Instance-Arn
-* Jupyter-S3
+* Jupyter-*
 
 S3
 The notebook server will need the following access to the shared S3 bucket for the Notebooks. The name of the Bucket is an ssm parameter in S3.
