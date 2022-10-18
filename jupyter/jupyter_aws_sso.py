@@ -5,7 +5,17 @@ import shlex
 from os.path import exists
 from IPython.display import display,Javascript
 
-def login(permission_set, account_id):
+session = boto3.Session(profile_name='default')
+ssm_client = session.client('ssm')
+sts_client = session.client('sts')
+   
+caller_identity = sts_client.get_caller_identity()
+
+def login(permission_set, account_id=''):
+    
+    if account_id=="":
+        account_id = caller_identity['Account']
+    
     init_profiles(permission_set, account_id)
     os.environ["AWS_PROFILE"] = f"{permission_set}-{account_id}"
     run_command("/usr/local/bin/aws sso login --no-browser")
@@ -37,13 +47,9 @@ def run_command(command):
     return rc
 
 def init_profiles(permission_set, account_id):
-    session = boto3.Session(profile_name='default')
-    ssm_client = session.client('ssm')
-
     sso_portal_url_response = ssm_client.get_parameter(Name='Jupyter-SSO-Portal-Url')
     sso_instance_response = ssm_client.get_parameter(Name='Jupyter-SSO-Directory')
     sso_instance_arn_response = ssm_client.get_parameter(Name='Jupyter-SSO-Instance-Arn')
-
 
     sso_portal_url = sso_portal_url_response['Parameter']['Value']
     sso_identity_store_id = sso_instance_response['Parameter']['Value']

@@ -20,9 +20,10 @@ https://us-east-1.console.aws.amazon.com/singlesignon/identity/home?region=us-ea
   * The ARN us under the details section.
   * The **AWS access portal URL** is in the Identity source section below, and **Identity store ID** is also in the Identity source section.
 1. Either upload the `sso-environment.yaml` file to the CloudFormation console, or use the CLI command below to create the stack.
-
+1. If your have a delegate account for CloudFormation organization stack sets, put that 12 digit AWS account id in the **CFN_ACCOUNT_ID** otherwise use the management account.
+1. If your have a logging account for CloudFormation organization stack sets, put that 12 digit AWS account id in the **LOGGING_ACCOUNT_ID** otherwise use the management account.
 ```
-aws cloudformation deploy --stack-name sso-config --capabilities CAPABILITY_IAM --parameter-overrides SsoDirectory=IDENTITY_SOURCE_ID SsoPortalUrl=PORTAL_URL SsoInstanceArn=IDENTITYINSTANCE_ARN --template-file sso-environment.yaml
+aws cloudformation deploy --stack-name sso-config --capabilities CAPABILITY_IAM --parameter-overrides SsoDirectory=IDENTITY_SOURCE_ID SsoPortalUrl=PORTAL_URL SsoInstanceArn=IDENTITYINSTANCE_ARN CfnDelegateAccount=CFN_ACCOUNT_ID LoggingAccount=LOGGING_ACCOUNT_ID --template-file sso-environment.yaml
 ```
 
 The `sso-environment.yaml` template will configure the following resources: 
