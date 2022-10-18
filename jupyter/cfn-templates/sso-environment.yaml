@@ -71,6 +71,30 @@ Resources:
         - arn:aws:iam::aws:policy/AmazonAthenaFullAccess
       Name: Jupyter-IR-ViewOnly
       SessionDuration: PT2H
+      InlinePolicy: '{
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "s3:GetObject"
+                ],
+                "Resource": "arn:aws:s3:::organization-logging-*"
+            },
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "kms:Decrypt"
+                ],
+                "Resource": "*",
+                "Condition": {
+                  "ForAnyValue:StringLike": {
+                    "kms:ResourceAliases": "alias/organizational-logging*"
+                  }
+                }
+            }
+          ]
+      }'
   SysAdminPermissionSet:
     Type: AWS::SSO::PermissionSet
     Properties: 
@@ -89,6 +113,7 @@ Resources:
         - arn:aws:iam::aws:policy/AdministratorAccess
       Name: Jupyter-IR-AdministratorAccess
       SessionDuration: PT2H
+
 
 Outputs:
   NotebookS3Bucket:

@@ -1,10 +1,15 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'This template will deploy an AWS Config rule to automatically remediate VPC Flow Logs enablement'
-
+Parameters:
+  ConfigRemediationRoleName:
+    Type: String
+    Description: The name of the config remediation role
 Resources:
+
   ConfigRemediationRole:
     Type: 'AWS::IAM::Role'
     Properties:
+      RoleName: !Ref ConfigRemediationRoleName
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -25,7 +30,8 @@ Resources:
                   - ec2:CreateFlowLogs
                   - logs:CreateLogDelivery
                   - logs:DeleteLogDelivery
-                Resource: arn:aws:logs:*:*:*
+                Resource: '*'
+                
 Outputs:
   ConfigRemediationRoleArn:
     Description: Arn of the IAM Role to perform auto-emediation

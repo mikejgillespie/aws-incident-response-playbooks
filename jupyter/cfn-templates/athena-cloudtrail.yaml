@@ -14,6 +14,14 @@ Parameters:
     Type: String
     Description: The table name for the Athena CloudTrail tables
 Resources:
+  CfnBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
   CFNDatabaseAuditLogs:
     Type: AWS::Glue::Database
     Properties:
@@ -136,3 +144,5 @@ Outputs:
   CFNTableCloudTrail:
     Description: The Athena table used to query cloudtrail logs
     Value: !Ref CFNTableCloudTrail  
+  CfnBucket:
+    Value: !Ref CfnBucket

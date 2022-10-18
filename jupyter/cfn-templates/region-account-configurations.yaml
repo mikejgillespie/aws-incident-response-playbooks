@@ -26,33 +26,10 @@ Parameters:
   CentralizedS3LoggingBucket:
     Description: Name of the S3 bucket in the logging account to send VPC Flow Logs.
     Type: String
-
+  ConfigRemediationRole:
+    Type: String
 Resources:
 
-  ConfigRemediationRole:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: 'Allow'
-            Principal:
-              Service:
-                - 'ssm.amazonaws.com'
-            Action:
-              - 'sts:AssumeRole'
-      Path: '/'
-      Policies:
-        - PolicyName: aws-config-remediate-vpc-flow-logs-policy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: 'Allow'
-                Action:
-                  - ec2:CreateFlowLogs
-                  - logs:CreateLogDelivery
-                  - logs:DeleteLogDelivery
-                Resource: arn:aws:logs:*:*:*
 
   ConfigRuleForEnableVpcFlowLogs: 
     Type: AWS::Config::ConfigRule
@@ -97,7 +74,7 @@ Resources:
           AutomationAssumeRole:
             StaticValue:
               Values: 
-                - !GetAtt ConfigRemediationRole.Arn
+                - !Sub arn:aws:iam::${AWS::AccountId}:role/${ConfigRemediationRole}
         TargetId: AWS-EnableVPCFlowLogs
         TargetType: SSM_DOCUMENT
         TargetVersion: 1
@@ -106,6 +83,3 @@ Outputs:
   ConfigRuleForEnableVpcFlowLogsArn:
     Description: Arn of the AWS Config Rule to enable VPC Flow Logs
     Value: !GetAtt ConfigRuleForEnableVpcFlowLogs.Arn
-  ConfigRemediationRoleArn:
-    Description: Arn of the IAM Role to perform auto-emediation
-    Value: !GetAtt ConfigRemediationRole.Arn
