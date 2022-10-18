@@ -110,7 +110,6 @@ pip install jupyterlab boto3
 ```
 
 ### Configuring The Jupyter Lab Server
-Once the notebook server is running and you are logged into JupyterLab, you can drag and drop the `configure-notebook-server.ipynb`  and `jupyter_aws_sso.py` files into the file explorer on the left side.
 
 Double click on the configure-notebook-server.ipynb and follow the instructions. This setup only needs to be done one time.
 
