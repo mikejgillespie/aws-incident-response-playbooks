@@ -8,24 +8,28 @@ The notebooks included in this repository combine automation in the form of pyth
 * **Notebook Server** The notebooks in this repositiry can use either SageMaker Notebooks or local Jupyter notebooks. A CloudFormation template is included to create a SageMaker Notebook server with the proper permissions.
 
 # Prerequisites
-This project assumes the accounts are organized with AWS organizations and authentication is managed by AWS Identity Center (Formerly SSO).
+This project assumes the accounts are organized with AWS organizations and authentication is managed by IAM Identity Center (Formerly SSO).
 
 
 # Installation
 First, clone the repo so you have a local copy.
 
 ## Account Configuration
-In order for the scripts to execute successfully, the account and organization must be configured to run the notebooks. Follow the steps to configure the account:
+In order for the scripts to execute successfully, the account and organization must be configured to have resources available for the notebooks to gather data such as CloudTrail logs and VPC Flow Logs. Follow the steps to configure the account:
 
 1. Identify the account and region that is hosting your AWS Identity Center. 
 1. Find the IAM Identity Center instance arn. You can find this by going to:
 https://us-east-1.console.aws.amazon.com/singlesignon/identity/home?region=us-east-1#!/settings
   * **Note, replace us-east-1 if your Identity center region is different than us-east-1**
-  * The ARN us under the details section.
+  * The **ARN** us under the details section.
   * The **AWS access portal URL** is in the Identity source section below, and **Identity store ID** is also in the Identity source section.
-1. Either upload the `sso-environment.yaml` file to the CloudFormation console, or use the CLI command below to create the stack.
-1. If your have a delegate account for CloudFormation organization stack sets, put that 12 digit AWS account id in the **CFN_ACCOUNT_ID** otherwise use the management account.
-1. If your have a logging account for CloudFormation organization stack sets, put that 12 digit AWS account id in the **LOGGING_ACCOUNT_ID** otherwise use the management account.
+  * Either upload the `sso-environment.yaml` file to the CloudFormation console, or use the CLI command below to create the stack.
+  * Parameters for CloudFormation stack.
+    1. **SsoDirectory**: The directory ID of the IAM Identity Center directory
+    1. **SsoPortalUrl**: The AWS Access Portal url. Found in the IAM Identity Center console
+    1. **SsoInstanceArn**: The IAM Identity Center Arn. Found in the IAM Identity Center console
+    1. **CfnDelegateAccount**: If your have a delegate account for CloudFormation organization stack sets, set that 12 digit AWS account id, otherwise use the management account.
+    1. **LoggingAccount**: If your have a logging account for CloudFormation organization stack sets, put that 12 digit AWS account id, otherwise use the management account.
 ```
 aws cloudformation deploy --stack-name sso-config --capabilities CAPABILITY_IAM --parameter-overrides SsoDirectory=IDENTITY_SOURCE_ID SsoPortalUrl=PORTAL_URL SsoInstanceArn=IDENTITYINSTANCE_ARN CfnDelegateAccount=CFN_ACCOUNT_ID LoggingAccount=LOGGING_ACCOUNT_ID --template-file sso-environment.yaml
 ```
@@ -39,8 +43,11 @@ The `sso-environment.yaml` template will configure the following resources:
   * S3 Bucket
   * SSO Instance ID
   * SSO Instance Arn
+  * CfnDelegateAccount
+  * LoggingAccount
 
-This will only create the permission sets. If you don't have them already, you will have to create users and groups in your Identity Center. Then you will to associate the AWS account with the permission sets and users/groups. 
+**Next Step**
+Associate the AWS accounts with the permission sets and users/groups. 
 
 * https://docs.aws.amazon.com/singlesignon/latest/userguide/addusers.html
 * https://docs.aws.amazon.com/singlesignon/latest/userguide/addgroups.html
