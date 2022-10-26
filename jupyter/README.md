@@ -14,9 +14,15 @@ This project assumes the accounts are organized with:
 
 
 # Installation
-First, clone the repo so you have a local copy.
+1. Clone the repo for a local copy
+1. Configure the **IAM Identity Center (Formerly SSO)**. See next section
+1. Create a Create a Jupyter Server instance either locally or using **SageMaker Notebooks**.
+1. Configure the **AWS Organizations** settings using the [Configure AWS Organzations](configure-aws-organizations.ipynb) notebook.
 
-## Account Configuration
+### Clone the Repo
+Clone this repo to get a copy of the source code locally.
+
+### IAM Identity Center (Formerly SSO) Configuration
 In order for the scripts to execute successfully, the account and organization must be configured to have resources available for the notebooks to gather data such as CloudTrail logs and VPC Flow Logs. Follow the steps to configure the account:
 
 1. Identify the account and region that is hosting your AWS Identity Center. 
@@ -25,13 +31,13 @@ https://us-east-1.console.aws.amazon.com/singlesignon/identity/home?region=us-ea
   * **Note, replace us-east-1 if your Identity center region is different than us-east-1**
   * The **ARN** us under the details section.
   * The **AWS access portal URL** is in the Identity source section below, and **Identity store ID** is also in the Identity source section.
-  * Either upload the `sso-environment.yaml` file to the CloudFormation console, or use the CLI command below to create the stack.
-  * Parameters for CloudFormation stack.
+  * Either upload the `sso-environment.yaml` file to the CloudFormation console, or use the CLI command below to create the stack. **Parameters for CloudFormation stack**:
     1. **SsoDirectory**: The directory ID of the IAM Identity Center directory
     1. **SsoPortalUrl**: The AWS Access Portal url. Found in the IAM Identity Center console
     1. **SsoInstanceArn**: The IAM Identity Center Arn. Found in the IAM Identity Center console
     1. **CfnDelegateAccount**: If your have a delegate account for CloudFormation organization stack sets, set that 12 digit AWS account id, otherwise use the management account.
     1. **LoggingAccount**: If your have a logging account for CloudFormation organization stack sets, put that 12 digit AWS account id, otherwise use the management account.
+ * AWS CLI Command:   
 ```
 aws cloudformation deploy --stack-name sso-config --capabilities CAPABILITY_IAM --parameter-overrides SsoDirectory=IDENTITY_SOURCE_ID SsoPortalUrl=PORTAL_URL SsoInstanceArn=IDENTITYINSTANCE_ARN CfnDelegateAccount=CFN_ACCOUNT_ID LoggingAccount=LOGGING_ACCOUNT_ID --template-file sso-environment.yaml
 ```
@@ -56,10 +62,10 @@ Associate the AWS accounts with the permission sets and users/groups.
 * https://aws.amazon.com/premiumsupport/knowledge-center/create-sso-permission-set
 
 
-## Create a Jupyter Server
+### Create a Jupyter Server
 There are two options you can choose from, either use a SageMaker notebook instance, or you can create a local notebook server.
 
-### SageMaker
+#### SageMaker
 The SageMaker notebooks should be deployed to the same account and region as the IAM Identity Center.
 
 A cloudformation template is included in this repo to create a Jupyter notebook instance with the correct permissions.
@@ -70,7 +76,7 @@ aws cloudformation deploy --stack-name sso-jupyter --capabilities CAPABILITY_IAM
 
 Skip ahead to **Configuring The Jupyter Lab Server**
 
-### Local
+#### Local
 The machine will need access to the [AWS CLI 2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html), and the default profile has access to the management account of IAM Identity Center.
 
 Identity Center Permissions
@@ -118,7 +124,7 @@ then install jupyterlab and
 pip install jupyterlab boto3
 ```
 
-### Configuring The Jupyter Lab Server
+#### Configuring The Jupyter Lab Server
 
 Enter into the jupyter folder of this repository - it should be loaded in the jupyter file navigator.
 
@@ -131,5 +137,7 @@ From this point, any notebook that starts with will these two lines of code will
 import jupyter_aws_sso
 jupyter_aws_sso.login(role, aws_account)
 ```
+
+## Configure the **AWS Organizations**
 
 Lastly, baseline your AWS organization be executing the [configure-aws-organization](configure-aws-organization.ipynb) notebook.
