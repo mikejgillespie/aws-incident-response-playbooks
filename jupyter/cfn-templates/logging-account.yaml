@@ -20,6 +20,7 @@ Parameters:
     Type: String
   RegionList:
     Type: String
+  
 Conditions:
   CreateBucket: !Equals 
     - !Ref FlowLogsBucket
@@ -31,6 +32,73 @@ Conditions:
     - !Ref FlowLogsFormat
     - 'parquet'
 Resources:
+  ConfigBucket:
+    DeletionPolicy: Retain
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+          ServerSideEncryptionConfiguration:
+            - ServerSideEncryptionByDefault:
+                SSEAlgorithm: AES256
+
+  ConfigBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ConfigBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: AWSConfigBucketPermissionsCheck
+            Effect: Allow
+            Principal:
+              Service:
+                - config.amazonaws.com
+            Action: s3:GetBucketAcl
+            Resource:
+              - !Sub "arn:${AWS::Partition}:s3:::${ConfigBucket}"
+          - Sid: AWSConfigBucketDelivery
+            Effect: Allow
+            Principal:
+              Service:
+                - config.amazonaws.com
+            Action: s3:PutObject
+            Resource:
+              - !Sub "arn:${AWS::Partition}:s3:::${ConfigBucket}/AWSLogs/${AWS::AccountId}/*"
+          - Sid: AWSConfigBucketSecureTransport
+            Action:
+              - s3:*
+            Effect: Deny
+            Resource:
+              - !Sub "arn:${AWS::Partition}:s3:::${ConfigBucket}"
+              - !Sub "arn:${AWS::Partition}:s3:::${ConfigBucket}/*"
+            Principal: "*"
+            Condition:
+              Bool:
+                aws:SecureTransport:
+                  false
+
+  ConfigTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "config-topic-${AWS::AccountId}-${AWS::StackName}"
+      DisplayName: AWS Config Notification Topic
+      KmsMasterKeyId: "alias/aws/sns"
+
+  ConfigTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref ConfigTopic
+      PolicyDocument:
+        Statement:
+          - Sid: AWSConfigSNSPolicy
+            Action:
+              - sns:Publish
+            Effect: Allow
+            Resource: !Ref ConfigTopic
+            Principal:
+              Service:
+                - config.amazonaws.com
   CfnBucket:
     Type: 'AWS::S3::Bucket'
     Properties:
@@ -402,6 +470,10 @@ Resources:
               serialization.format: '1'
           StoredAsSubDirectories: false
 Outputs:
+    ConfigTopic:
+      Value: !Ref ConfigTopic
+    ConfigBucket:
+      Value: !Ref ConfigBucket
     CfnBucket:
       Value: !Ref CfnBucket
     BucketName:

@@ -8,6 +8,7 @@ Resources:
     Properties:
       InstanceType: "ml.t2.large"
       RoleArn: !GetAtt ExecutionRole.Arn
+      DefaultCodeRepository: https://github.com/mikejgillespie/aws-incident-response-playbooks
   ExecutionRole: 
     Type: "AWS::IAM::Role"
     Properties: 

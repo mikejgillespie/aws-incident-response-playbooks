@@ -23,9 +23,6 @@ database_name = database_response['Parameter']['Value']
 
 
 def run_query(sql):
-
-    
-    #print(query)
     sts_client = boto3.client('sts')
 
     response = sts_client.get_caller_identity()

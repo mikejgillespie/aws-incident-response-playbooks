@@ -8,7 +8,9 @@ The notebooks included in this repository combine automation in the form of pyth
 * **Notebook Server** The notebooks in this repositiry can use either SageMaker Notebooks or local Jupyter notebooks. A CloudFormation template is included to create a SageMaker Notebook server with the proper permissions.
 
 # Prerequisites
-This project assumes the accounts are organized with AWS organizations and authentication is managed by IAM Identity Center (Formerly SSO).
+This project assumes the accounts are organized with:
+* **AWS Organizations**
+* **IAM Identity Center (Formerly SSO)**
 
 
 # Installation
