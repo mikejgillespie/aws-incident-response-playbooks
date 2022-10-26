@@ -39,7 +39,6 @@ def run_query(query_expression, max_items = 200):
     
     jsonResults = []
     for page in page_iterator:
-        print(page['QueryInfo'])
         for item in page['Results']:
             rec = {}
             json_item = json.loads(item)
