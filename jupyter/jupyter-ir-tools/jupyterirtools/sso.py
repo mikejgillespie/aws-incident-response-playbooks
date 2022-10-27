@@ -15,13 +15,15 @@ def login(permission_set, account_id=''):
     run_command("aws sso login --no-browser")
 
 def get_management_session(permission_set):
-    
     account_id = os.environ.get('MANAGEMENT_ACCOUNT')
+    return get_session(permission_set, account_id)
+
+def get_session(permission_set, account_id, region_name='us-east-1'):
     profile = f"{permission_set}-{account_id}"
     
     init_profiles(permission_set, account_id)
 
-    return boto3.session.Session(profile_name=profile)
+    return boto3.session.Session(profile_name=profile, region_name=region_name)
     
     
 def run_command(command):
@@ -54,7 +56,7 @@ def init_profiles(permission_set, account_id):
     if os.path.isfile(os.path.expanduser('~') + "/.aws/config"):
         with open(os.path.expanduser('~') + "/.aws/config") as myfile:
             if f'{permission_set}-{account_id}' in myfile.read():
-                print("Profile found")
+                #print("Profile found")
                 return
     
     

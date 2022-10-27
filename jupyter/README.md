@@ -187,8 +187,9 @@ Double click on the configure-notebook-server.ipynb and follow the instructions 
 
 From this point, any notebook that starts with will these two lines of code will initiate the SSO login.
 ```
-import jupyter_aws_sso
-jupyter_aws_sso.login(role, aws_account)
+from jupyterirtools import sso
+
+sso.login(role, aws_account)
 ```
 
 ## Configure the **AWS Organizations**
