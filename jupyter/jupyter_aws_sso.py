@@ -13,6 +13,15 @@ def login(permission_set, account_id=''):
     init_profiles(permission_set, account_id)
     os.environ["AWS_PROFILE"] = f"{permission_set}-{account_id}"
     run_command("/usr/local/bin/aws sso login --no-browser")
+
+def get_management_session(permission_set):
+    
+    account_id = os.environ.get('MANAGEMENT_ACCOUNT')
+    profile = f"{permission_set}-{account_id}"
+    
+    init_profiles(permission_set, account_id)
+
+    return boto3.session.Session(profile_name=profile)
     
     
 def run_command(command):
