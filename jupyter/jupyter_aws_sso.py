@@ -56,9 +56,6 @@ def init_profiles(permission_set, account_id):
             if f'{permission_set}-{account_id}' in myfile.read():
                 print("Profile found")
                 return
-            else:
-                os.rename(os.path.expanduser('~') + "/.aws/config", os.path.expanduser('~') + "/.aws/config.bak")    
-
     
     
     profile_name = f"{permission_set}-{account_id}"
