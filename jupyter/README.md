@@ -95,20 +95,39 @@ The notebook server will need the following access to the shared S3 bucket for t
 * s3:ListBucket
 
 
-**Mac / Linux**
+##### MacOS
 
-
+If the AWS CLI v2 is not installed:
+```
+curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
+sudo installer -pkg AWSCLIV2.pkg -target /
+```
 
 The Jupyter server can be installed using pip.
 ```
-pip install jupyterlab
+pip install jupyterlab boto3 pyathena
 ```
+
+Add the environment variables to your ~/.bash_profile or ~/.zshrc file depending on which version of MacOS your are running.
+
+Starting with macOS Catalina (10.15), Apple set the default shell to the Z shell (zsh). In previous macOS versions, the default was Bash.
+
+Add these lines to your ~/.zshrc file for zsh and ~/.bash_profile for bash:
+```
+export LOGGING_ACCOUNT=<LOGGING_ACCOUNT_ID>
+export SSO_URL=<SSO LOGIN URL>
+export SSO_REGION=<SSO REGION>
+export MANAGEMENT_ACCOUNT=<MANAGEMENT_ACCOUNT_ID>
+```
+
+Restart your terminal window so these changes take effect.
 
 Then run the Jupyter Lab server:
 ```
 jupyter-lab
 ```
-**Windows**
+
+##### Windows
 Install Pip if it isn't already installed:
 ```
 curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
@@ -129,14 +148,15 @@ aws configure sso
 
 Set the environment variables for the SSO environment
 ```
-xset LOGGING_ACCOUNT=<LOGGING_ACCOUNT_ID>
-xset SSO_URL=<SSO LOGIN URL>
-xset SSO_REGION=<SSO REGION>
+setx LOGGING_ACCOUNT <LOGGING_ACCOUNT_ID>
+setx SSO_URL <SSO LOGIN URL>
+setx SSO_REGION <SSO REGION>
+setx MANAGEMENT_ACCOUNT <MANAGEMENT_ACCOUNT_ID>
 ```
 
 then install jupyterlab and 
 ```
-pip install jupyterlab boto3
+pip install jupyterlab boto3 pyathena
 ```
 Run jupyter:
 ```
