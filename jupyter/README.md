@@ -46,7 +46,7 @@ The `sso-environment.yaml` template will configure the following resources:
 * SSO Permission Sets
   * **ViewOnly** Read Only Access to accounts
   * **SysAdmin** Systems Administrator access
-  * **Administrator** Full Administrator access. Use only in break-glass scenarios.
+  * **Administrator** Full Administrator access. Use only in initial setup and break-glass scenarios.
 * Parameters
   * S3 Bucket
   * SSO Instance ID
@@ -143,14 +143,6 @@ Install the CLI v2:
 ```
 msiexec.exe /i https://awscli.amazonaws.com/AWSCLIV2.msi
 ```
-
-Configure AWS
-```
-aws configure sso
-```
-1. Provide the SSO URL
-1. Select the Management Account and Jupyter-IR-AdministratatorAccess role
-1. Set the default region
 
 Set the environment variables for the SSO environment
 ```
