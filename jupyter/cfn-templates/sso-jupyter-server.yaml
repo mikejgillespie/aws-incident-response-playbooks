@@ -1,13 +1,99 @@
 Description: "Create basic notebook instance"
 Description: >-
   Creates a SageMaker Jupyter runbook configured to run against SSO.
-  
+Parameters:
+  SsoUrl:
+    Type: String
+    Description: The URL for the IAM Identity Center (SSO)
+  SsoRegion:
+    Type: String
+    Description: The Region for the IAM Identity Center (SSO)
+  LoggingAccount:
+    Type: String
+    Description: The 12-digit AWS account ID for the logging account.
+  ManagementAccount:
+    Type: String
+    Description: The 12-digit AWS account ID for the AWS Organizations management account.
 Resources:
+  BasicNotebookInstanceLifecycleConfig:
+    Type: "AWS::SageMaker::NotebookInstanceLifecycleConfig"
+    Properties:
+      OnCreate:
+      - Content:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+
+            set -e
+
+            sudo -u ec2-user -i <<'EOF'
+            unset SUDO_UID
+            # Install a separate conda installation via Miniconda
+            WORKING_DIR=/home/ec2-user/SageMaker/custom-miniconda
+            mkdir -p "$WORKING_DIR"
+            wget https://repo.anaconda.com/miniconda/Miniconda3-4.6.14-Linux-x86_64.sh -O "$WORKING_DIR/miniconda.sh"
+            bash "$WORKING_DIR/miniconda.sh" -b -u -p "$WORKING_DIR/miniconda" 
+            rm -rf "$WORKING_DIR/miniconda.sh"
+            # Create a custom conda environment
+            source "$WORKING_DIR/miniconda/bin/activate"
+            KERNEL_NAME="incident_response"
+            PYTHON="3.8"
+            conda create --yes --name "$KERNEL_NAME" python="$PYTHON"
+            conda activate "$KERNEL_NAME"
+            pip install --quiet ipykernel
+            # Customize these lines as necessary to install the required packages
+            conda install --yes numpy
+            pip install --quiet boto3 pyathena
+            EOF
+
+      OnStart:
+      - Content:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+
+            set -e
+
+            # OVERVIEW
+            # This script gets value from Notebook Instance's tag and sets it as environment
+            # variable for all process including Jupyter in SageMaker Notebook Instance
+            #
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip -qq awscliv2.zip
+            sudo ./aws/install --update
+            rm -rf aws
+            rm awscliv2.zip
+
+            rm -f /home/ec2-user/anaconda3/envs/JupyterSystemEnv/bin/aws
+
+            # PARAMETERS
+            touch /etc/profile.d/jupyter-env.sh
+            echo "export MANAGEMENT_ACCOUNT=${ManagementAccount}" >> /etc/profile.d/jupyter-env.sh
+            echo "export LOGGING_ACCOUNT=${LoggingAccount}" >> /etc/profile.d/jupyter-env.sh
+            echo "export SSO_URL=${SsoUrl}" >> /etc/profile.d/jupyter-env.sh
+            echo "export SSO_REGION=${SsoRegion}" >> /etc/profile.d/jupyter-env.sh
+            initctl restart jupyter-server --no-wait
+
+            sudo -u ec2-user -i <<'EOF'
+            unset SUDO_UID
+            WORKING_DIR=/home/ec2-user/SageMaker/custom-miniconda/
+            source "$WORKING_DIR/miniconda/bin/activate"
+            for env in $WORKING_DIR/miniconda/envs/*; do
+                BASENAME=$(basename "$env")
+                source activate "$BASENAME"
+                python -m ipykernel install --user --name "$BASENAME" --display-name "$BASENAME (Python3)"
+            done
+            # Optionally, uncomment these lines to disable SageMaker-provided Conda functionality.
+            # echo "c.EnvironmentKernelSpecManager.use_conda_directly = False" >> /home/ec2-user/.jupyter/jupyter_notebook_config.py
+            # rm /home/ec2-user/.condarc
+            EOF
+
+            echo "Restarting the Jupyter server.."
+            restart jupyter-server
   BasicNotebookInstance:
     Type: "AWS::SageMaker::NotebookInstance"
     Properties:
       InstanceType: "ml.t2.large"
       RoleArn: !GetAtt ExecutionRole.Arn
+      LifecycleConfigName: !GetAtt BasicNotebookInstanceLifecycleConfig.NotebookInstanceLifecycleConfigName
       DefaultCodeRepository: https://github.com/mikejgillespie/aws-incident-response-playbooks
   ExecutionRole: 
     Type: "AWS::IAM::Role"
@@ -24,8 +110,20 @@ Resources:
           - "sts:AssumeRole"
       Path: "/"
       Policies: 
-        - 
-          PolicyName: "List-SSO-PermissionSets-Accounts"
+        - PolicyName: write-logs
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - Effect: "Allow"
+                Action: 
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:DescribeLogStreams"
+                  - "logs:PutLogEvents"
+                  - "logs:GetLogEvents"
+                Resource: 
+                - '*'
+        - PolicyName: "List-SSO-PermissionSets-Accounts"
           PolicyDocument: 
             Version: "2012-10-17"
             Statement: 

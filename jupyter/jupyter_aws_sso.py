@@ -5,16 +5,10 @@ import shlex
 from os.path import exists
 from IPython.display import display,Javascript
 
-session = boto3.Session(profile_name='default')
-ssm_client = session.client('ssm')
-sts_client = session.client('sts')
-   
-caller_identity = sts_client.get_caller_identity()
-
 def login(permission_set, account_id=''):
     
     if account_id=="":
-        account_id = caller_identity['Account']
+        account_id = os.environ.get('LOGGING_ACCOUNT')
     
     init_profiles(permission_set, account_id)
     os.environ["AWS_PROFILE"] = f"{permission_set}-{account_id}"
@@ -47,19 +41,7 @@ def run_command(command):
     return rc
 
 def init_profiles(permission_set, account_id):
-    sso_portal_url_response = ssm_client.get_parameter(Name='Jupyter-SSO-Portal-Url')
-    sso_instance_response = ssm_client.get_parameter(Name='Jupyter-SSO-Directory')
-    sso_instance_arn_response = ssm_client.get_parameter(Name='Jupyter-SSO-Instance-Arn')
 
-    sso_portal_url = sso_portal_url_response['Parameter']['Value']
-    sso_identity_store_id = sso_instance_response['Parameter']['Value']
-    sso_identity_store_arn = sso_instance_arn_response['Parameter']['Value']
-    
-    sso_region = "us-east-1"
-
-    session = boto3.Session(profile_name='default')
-    sso_admin_client = session.client('sso-admin', region_name = sso_region)
-    
     if os.path.isfile(os.path.expanduser('~') + "/.aws/config"):
         with open(os.path.expanduser('~') + "/.aws/config") as myfile:
             if f'{permission_set}-{account_id}' in myfile.read():
@@ -67,32 +49,20 @@ def init_profiles(permission_set, account_id):
                 return
             else:
                 os.rename(os.path.expanduser('~') + "/.aws/config", os.path.expanduser('~') + "/.aws/config.bak")    
+
     
-    aws_config = f"""[default]
-region = {sso_region}
-"""
+    
+    profile_name = f"{permission_set}-{account_id}"
+    cr = '\n'
+    aws_config = f"[profile {profile_name}]{cr}"
+    aws_config += f"sso_start_url = {os.environ['SSO_URL']}{cr}"
+    aws_config += f"sso_region ={os.environ['SSO_REGION']}{cr}"
+    aws_config += f"sso_account_id = {account_id}{cr}"
+    aws_config += f"sso_role_name = {permission_set}{cr}"
+    aws_config += f"region = {os.environ['SSO_REGION']}{cr}"
+    aws_config += '\n'
 
-    permission_sets = sso_admin_client.list_permission_sets(InstanceArn=sso_identity_store_arn)
-
-    for permission_set in permission_sets['PermissionSets']:
-        permission_set_detail = sso_admin_client.describe_permission_set(
-            InstanceArn=sso_identity_store_arn,
-            PermissionSetArn=permission_set
-        )
-        accounts = sso_admin_client.list_accounts_for_provisioned_permission_set(
-            InstanceArn=sso_identity_store_arn,
-            PermissionSetArn=permission_set
-        )
-        for account in accounts["AccountIds"]:
-            aws_config += f'[profile {permission_set_detail["PermissionSet"]["Name"]}-{account}]\n'
-            aws_config += f'sso_start_url = {sso_portal_url}\n'
-            aws_config += f'sso_region ={sso_region}\n'
-            aws_config += f'sso_account_id = {account}\n'
-            aws_config += f'sso_role_name = {permission_set_detail["PermissionSet"]["Name"]}\n'
-            aws_config += f'region = {sso_region}\n'
-            aws_config += '\n'
-
-    f = open(os.path.expanduser('~') + "/.aws/config", "w")
+    f = open(os.path.expanduser('~') + "/.aws/config", "a")
     f.write(aws_config)
     f.close()
-    #print(aws_config)
+    print(aws_config)

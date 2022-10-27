@@ -119,18 +119,37 @@ Install the CLI v2:
 msiexec.exe /i https://awscli.amazonaws.com/AWSCLIV2.msi
 ```
 
+Configure AWS
+```
+aws configure sso
+```
+1. Provide the SSO URL
+1. Select the Management Account and Jupyter-IR-AdministratatorAccess role
+1. Set the default region
+
+Set the environment variables for the SSO environment
+```
+xset LOGGING_ACCOUNT=<LOGGING_ACCOUNT_ID>
+xset SSO_URL=<SSO LOGIN URL>
+xset SSO_REGION=<SSO REGION>
+```
+
 then install jupyterlab and 
 ```
 pip install jupyterlab boto3
 ```
+Run jupyter:
+```
+jupyter-lab
+```
+
 
 #### Configuring The Jupyter Lab Server
 
 Enter into the jupyter folder of this repository - it should be loaded in the jupyter file navigator.
 
-Double click on the configure-notebook-server.ipynb and follow the instructions. This setup only needs to be done one time.
+Double click on the configure-notebook-server.ipynb and follow the instructions to verify the notebook configuration. This setup only needs to be done one time.
 
-**Enhancement: The notebook server can be automated to automatically run a notebook. We can configure the notebook to load the notebook and execute it, skipping these two manual steps.**
 
 From this point, any notebook that starts with will these two lines of code will initiate the SSO login.
 ```
