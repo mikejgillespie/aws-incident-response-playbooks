@@ -70,11 +70,17 @@ The SageMaker notebooks should be deployed to the same account and region as the
 
 A cloudformation template is included in this repo to create a Jupyter notebook instance with the correct permissions.
 
+**Parameters**:
+* **SsoRegion**: The region the SSO instance is running
+* **SsoUrl**: The URL to connect to the SSO instance
+* **LoggingAccount**: The AWS Account ID for the logging account
+* **ManagementAccount**: The AWS Account ID for the management account
+
 ```
-aws cloudformation deploy --stack-name sso-jupyter --capabilities CAPABILITY_IAM --template-file jupyter-notebook-instance.yaml
+aws cloudformation deploy --capabilities CAPABILITY_IAM --template-file sso-jupyter-server.yaml --parameter-overrides SsoRegion=<SSO_REGION> SsoUrl=<SSO_URL> LoggingAccount=<LOGGING_ACCOUNT> ManagementAccount=<MANAGEMENT_ACCOUNT> --stack-name sso-jupyter-notebook
 ```
 
-Skip ahead to **Configuring The Jupyter Lab Server**
+Skip ahead to **Verifying The Jupyter Lab Server**
 
 #### Local
 The machine will need access to the [AWS CLI 2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html), and the default profile has access to the management account of IAM Identity Center.
@@ -164,7 +170,7 @@ jupyter-lab
 ```
 
 
-#### Configuring The Jupyter Lab Server
+#### Verifying The Jupyter Lab Server
 
 Enter into the jupyter folder of this repository - it should be loaded in the jupyter file navigator.
 
