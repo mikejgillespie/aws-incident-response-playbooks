@@ -12,7 +12,7 @@ def login(permission_set, account_id=''):
     
     init_profiles(permission_set, account_id)
     os.environ["AWS_PROFILE"] = f"{permission_set}-{account_id}"
-    run_command("/usr/local/bin/aws sso login --no-browser")
+    run_command("aws sso login --no-browser")
 
 def get_management_session(permission_set):
     
@@ -71,4 +71,4 @@ def init_profiles(permission_set, account_id):
     f = open(os.path.expanduser('~') + "/.aws/config", "a")
     f.write(aws_config)
     f.close()
-    print(aws_config)
+    #print(aws_config)

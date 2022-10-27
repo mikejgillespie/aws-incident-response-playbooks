@@ -103,6 +103,7 @@ The notebook server will need the following access to the shared S3 bucket for t
 
 
 ##### MacOS
+**Start in the project directory**
 
 If the AWS CLI v2 is not installed:
 ```
@@ -129,12 +130,20 @@ export MANAGEMENT_ACCOUNT=<MANAGEMENT_ACCOUNT_ID>
 
 Restart your terminal window so these changes take effect.
 
+```
+cd jupyter
+pip install -e jupyter-ir-tools
+```
+
 Then run the Jupyter Lab server:
 ```
 jupyter-lab
 ```
 
 ##### Windows
+
+**Start in the project directory**
+
 Install Pip if it isn't already installed:
 ```
 curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
@@ -157,6 +166,12 @@ then install jupyterlab and
 ```
 pip install jupyterlab boto3 pyathena
 ```
+
+```
+cd jupyter
+pip install -e jupyter-ir-tools
+```
+
 Run jupyter:
 ```
 jupyter-lab
