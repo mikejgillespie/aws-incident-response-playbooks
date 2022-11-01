@@ -22,6 +22,12 @@ Parameters:
     Type: String
   ExistingConfigBucket:
     Type: String
+  CloudTrailLocationTemplate:
+    Type: String
+    Default: ''
+  CloudTrailLocation:
+    Type: String
+    Default: ''
 Conditions:
   CreateBucket: !Equals 
     - !Ref FlowLogsBucket
@@ -313,7 +319,7 @@ Resources:
           "storage.location.template":  !If 
             - CreateCloudTrailBucket
             - !Sub s3://${CfnCloudTrailLogsBucket}/AWSLogs/${OrgId}/${!accountid}/CloudTrail/${!region}/${!timestamp}/
-            - !Sub s3://${CloudTrailLogsBucket}/${OrgId}/AWSLogs/${OrgId}/${!accountid}/CloudTrail/${!region}/${!timestamp}/
+            - !Ref CloudTrailLocationTemplate
           "projection.accountid.type": "injected"
           "projection.region.type": "enum"
           "projection.region.values": !Ref RegionList
@@ -404,7 +410,7 @@ Resources:
           Location: !If 
             - CreateCloudTrailBucket
             - !Sub s3://${CfnCloudTrailLogsBucket}/AWSLogs/${OrgId}/CloudTrail/
-            - !Sub s3://${CloudTrailLogsBucket}/${OrgId}/AWSLogs/${OrgId}/
+            - !Ref CloudTrailLocation
           InputFormat: com.amazon.emr.cloudtrail.CloudTrailInputFormat
           OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
           Compressed: false
