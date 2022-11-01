@@ -3,20 +3,20 @@ from datetime import timedelta
 import boto3
 from IPython import display
 import json
+import os
 import pyathena as pa
 import pandas as pd
 from pyathena.pandas.util import as_pandas
 from pyathena import connect
+from . import sso
 
-session = boto3.Session(profile_name='default')
+session = sso.get_session("Jupyter-IR-AdministratorAccess", os.environ['MANAGEMENT_ACCOUNT'])
 ssm_client = session.client('ssm')
-    
-management_account_response = ssm_client.get_parameter(Name='Jupyter-Management-Account')
-management_region_response = ssm_client.get_parameter(Name='Jupyter-Management-Region')
+
 aggregator_response = ssm_client.get_parameter(Name='Jupyter-Config-Aggregator')
 
-management_account = management_account_response['Parameter']['Value']
-management_region = management_region_response['Parameter']['Value']
+management_account = os.environ['MANAGEMENT_ACCOUNT']
+management_region = 'us-east-1'
 config_aggregator_id = aggregator_response['Parameter']['Value']
 
 

@@ -20,7 +20,8 @@ Parameters:
     Type: String
   RegionList:
     Type: String
-  
+  ExistingConfigBucket:
+    Type: String
 Conditions:
   CreateBucket: !Equals 
     - !Ref FlowLogsBucket
@@ -31,18 +32,18 @@ Conditions:
   FlowLogsParquet: !Equals 
     - !Ref FlowLogsFormat
     - 'parquet'
+  CreateConfigBucket: !Equals 
+    - !Ref ExistingConfigBucket
+    - ''
 Resources:
   ConfigBucket:
     DeletionPolicy: Retain
     Type: AWS::S3::Bucket
-    Properties:
-      BucketEncryption:
-          ServerSideEncryptionConfiguration:
-            - ServerSideEncryptionByDefault:
-                SSEAlgorithm: AES256
+    Condition: CreateConfigBucket
 
   ConfigBucketPolicy:
     Type: AWS::S3::BucketPolicy
+    Condition: CreateConfigBucket
     Properties:
       Bucket: !Ref ConfigBucket
       PolicyDocument:
@@ -99,63 +100,6 @@ Resources:
             Principal:
               Service:
                 - config.amazonaws.com
-  CfnBucket:
-    Type: 'AWS::S3::Bucket'
-    Properties:
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
-  CfnBucketPolicy:
-    Type: 'AWS::S3::BucketPolicy'
-    Properties:
-      Bucket: !Ref CfnBucket
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-        - Sid: AWSCloudFormation
-          Effect: Allow
-          Principal:
-            "Service": 
-              - "cloudformation.amazonaws.com"
-          Action:
-          - 's3:ListBucket'
-          Resource: 
-          - !Sub 'arn:aws:s3:::${CfnBucket}'
-        - Sid: AWSCloudFormation2
-          Effect: Allow
-          Principal:
-            "Service": 
-              - "cloudformation.amazonaws.com"
-          Action:
-          - 's3:GetObject'
-          Resource: 
-          - !Sub 'arn:aws:s3:::${CfnBucket}/*'
-        - Sid: GetObjectOrganization
-          Effect: Allow
-          Principal:
-            AWS:
-            - '*'
-          Action:
-          - 's3:ListBucket'
-          Resource: 
-          - !Sub 'arn:aws:s3:::${CfnBucket}'
-          Condition:
-            StringEquals:
-              "aws:PrincipalOrgID": !Ref OrgId
-        - Sid: GetObjectOrganization2
-          Effect: Allow
-          Principal:
-            AWS:
-            - '*'
-          Action:
-          - 's3:GetObject'
-          Resource: 
-          - !Sub 'arn:aws:s3:::${CfnBucket}/*'
-          Condition:
-            StringEquals:
-              "aws:PrincipalOrgID": !Ref OrgId
   CFNDatabaseAuditLogs:
     Type: AWS::Glue::Database
     Properties:
@@ -246,6 +190,7 @@ Resources:
   CFNTableFlowLogs:
     # Creating the table waits for the database to be created
     Type: AWS::Glue::Table
+    DependsOn: CFNDatabaseAuditLogs
     Properties:
       CatalogId: !Ref AWS::AccountId
       DatabaseName: !Ref DatabaseName
@@ -368,7 +313,7 @@ Resources:
           "storage.location.template":  !If 
             - CreateCloudTrailBucket
             - !Sub s3://${CfnCloudTrailLogsBucket}/AWSLogs/${OrgId}/${!accountid}/CloudTrail/${!region}/${!timestamp}/
-            - !Sub s3://${CloudTrailLogsBucket}/AWSLogs/${OrgId}/${!accountid}/CloudTrail/${!region}/${!timestamp}/
+            - !Sub s3://${CloudTrailLogsBucket}/${OrgId}/AWSLogs/${OrgId}/${!accountid}/CloudTrail/${!region}/${!timestamp}/
           "projection.accountid.type": "injected"
           "projection.region.type": "enum"
           "projection.region.values": !Ref RegionList
@@ -456,11 +401,10 @@ Resources:
             - Name: vpcendpointid
               Type: string
               Comment: ''
-          Location: !Sub s3://${TrailBucket}/AWSLogs/${AWS::AccountId}/CloudTrail/
           Location: !If 
             - CreateCloudTrailBucket
             - !Sub s3://${CfnCloudTrailLogsBucket}/AWSLogs/${OrgId}/CloudTrail/
-            - !Sub s3://${CloudTrailLogsBucket}/AWSLogs/${OrgId}/CloudTrail/
+            - !Sub s3://${CloudTrailLogsBucket}/${OrgId}/AWSLogs/${OrgId}/
           InputFormat: com.amazon.emr.cloudtrail.CloudTrailInputFormat
           OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
           Compressed: false
@@ -473,9 +417,7 @@ Outputs:
     ConfigTopic:
       Value: !Ref ConfigTopic
     ConfigBucket:
-      Value: !Ref ConfigBucket
-    CfnBucket:
-      Value: !Ref CfnBucket
+      Value: !If [CreateConfigBucket, !Ref ConfigBucket, !Ref ExistingConfigBucket]
     BucketName:
       Value: !If [CreateBucket, !Ref FlowLogBucket, !Ref FlowLogsBucket]
     CloudTrailLogsBucket:

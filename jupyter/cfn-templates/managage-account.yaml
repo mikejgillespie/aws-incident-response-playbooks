@@ -16,6 +16,7 @@ Conditions:
 Resources:
   TrailKeyAlias:
     Type: AWS::KMS::Alias
+    Condition: CreateTrail
     Properties: 
       AliasName: !Sub alias/organizational-logging-${AWS::StackName}
       TargetKeyId: !Ref TrailKey

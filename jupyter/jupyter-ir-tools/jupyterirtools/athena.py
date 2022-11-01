@@ -16,14 +16,12 @@ from . import sso
 session = sso.get_session("Jupyter-IR-AdministratorAccess", os.environ['MANAGEMENT_ACCOUNT'])
 ssm_client = session.client('ssm')
     
-management_account_response = ssm_client.get_parameter(Name='Jupyter-Management-Account')
-management_region_response = ssm_client.get_parameter(Name='Jupyter-Management-Region')
-logging_account_response = ssm_client.get_parameter(Name='Jupyter-Athena-LoggingAccount')
+
 database_response = ssm_client.get_parameter(Name='Jupyter-Athena-Database')
     
-management_account = management_account_response['Parameter']['Value']
-management_region = management_region_response['Parameter']['Value']
-logging_account = logging_account_response['Parameter']['Value']
+management_account = os.environ['MANAGEMENT_ACCOUNT']
+management_region = 'us-east-1'
+logging_account = os.environ['LOGGING_ACCOUNT']
 database_name = database_response['Parameter']['Value']
 
 
