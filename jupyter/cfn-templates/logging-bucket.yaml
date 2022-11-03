@@ -1,0 +1,45 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Creates the flow logs Athena table
+
+Resources:
+  CfnCloudTrailLogsBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  CfnCloudTrailLogsPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket: !Ref CfnCloudTrailLogsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: AWSCloudTrailAclCheck
+          Effect: Allow
+          Principal:
+            Service:
+            - 'cloudtrail.amazonaws.com'
+            - 'delivery.logs.amazonaws.com'
+            - 'config.amazonaws.com'
+          Action: 's3:GetBucketAcl'
+          Resource: !Sub 'arn:aws:s3:::${CfnCloudTrailLogsBucket}'
+        - Sid: AWSCloudTrailWrite
+          Effect: Allow
+          Principal:
+            Service:
+            - 'cloudtrail.amazonaws.com'
+            - 'delivery.logs.amazonaws.com'
+            - 'config.amazonaws.com'
+          Action: 's3:PutObject'
+          Resource: [
+            !Sub 'arn:aws:s3:::${CfnCloudTrailLogsBucket}/*'
+          ]
+          Condition:
+            StringEquals:
+              's3:x-amz-acl': 'bucket-owner-full-control'
+Outputs:
+    CloudTrailLogsBucket:
+      Value: !Ref CfnCloudTrailLogsBucket

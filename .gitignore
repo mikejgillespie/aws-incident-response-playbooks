@@ -4,3 +4,6 @@ jupyter/jupyter-ir-tools/jupyterirtools/__pycache__/
 jupyter/jupyter-ir-tools/jupyterirtools/.ipynb_checkpoints/
 jupyter/cfn-templates/.ipynb_checkpoints/
 jupyter/runbooks/.ipynb_checkpoints/
+jupyter/config.json
+jupyter/jupyter-ir-tools/.ipynb_checkpoints/
+jupyter/configuration-notebooks/.ipynb_checkpoints

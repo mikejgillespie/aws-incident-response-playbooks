@@ -1,29 +1,11 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'This template will deploy an AWS Config rule to automatically remediate VPC Flow Logs enablement'
 Parameters:
-  ConfigRecorderRoleName:
-    Type: String
-    Description: The name of the config remediation role
   ConfigRemediationRoleName:
     Type: String
     Description: The name of the config remediation role
 Resources:
-  ConfigRecorderRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Ref ConfigRecorderRoleName
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - config.amazonaws.com
-            Action:
-              - sts:AssumeRole
-      Path: /
-      ManagedPolicyArns:
-        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWS_ConfigRole"
+
 
   ConfigRemediationRole:
     Type: 'AWS::IAM::Role'

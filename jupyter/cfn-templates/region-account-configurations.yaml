@@ -35,37 +35,8 @@ Parameters:
     Type: String
   ConfigRemediationRole:
     Type: String
-  ConfigRecorderRole:
-    Type: String
-  ConfigTopic:
-    Type: String
-  ConfigBucket:
-    Type: String 
-    
-Conditions:    
-  CreateRecorder: !Not
-    - !Equals 
-      - !Ref ConfigBucket
-      - ''
+
 Resources:
-  ConfigRecorder:
-    Type: AWS::Config::ConfigurationRecorder
-    Condition: CreateRecorder
-    Properties:
-      RoleARN: !Sub arn:aws:iam::${AWS::AccountId}:role/${ConfigRecorderRole}
-      RecordingGroup:
-        AllSupported: True
-        IncludeGlobalResourceTypes: False
-
-  ConfigDeliveryChannel:
-    Type: AWS::Config::DeliveryChannel
-    Condition: CreateRecorder
-    Properties:
-      ConfigSnapshotDeliveryProperties:
-        DeliveryFrequency: One_Hour
-      S3BucketName: !Ref ConfigBucket
-      SnsTopicARN: !Ref ConfigTopic
-
   ConfigRuleForEnableVpcFlowLogs: 
     Type: AWS::Config::ConfigRule
     Properties: 

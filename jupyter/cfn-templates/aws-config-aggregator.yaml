@@ -1,18 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Creates the flow logs Athena table
-Parameters:
-  AggregatorId:
-    Type: String
-  RegionList:
-    Type: String
-Conditions:
-  CreateAggregator: !Equals 
-    - !Ref AggregatorId
-    - ''
 Resources:
   ConfigAggregatorRole:
     Type: AWS::IAM::Role
-    Condition: CreateAggregator
     Properties:
       AssumeRolePolicyDocument:
         Version: 2012-10-17
@@ -28,7 +18,6 @@ Resources:
         - arn:aws:iam::aws:policy/service-role/AWSConfigRoleForOrganizations
   Aggregator: 
     Type: AWS::Config::ConfigurationAggregator
-    Condition: CreateAggregator
     Properties: 
       OrganizationAggregationSource: 
         AllAwsRegions: True
@@ -39,8 +28,8 @@ Resources:
       Description: This contains the AWS Config organizational aggregator
       Type: String
       Name: Jupyter-Config-Aggregator
-      Value: !If [CreateAggregator, !Ref Aggregator, !Ref AggregatorId]
+      Value: !Ref Aggregator
       
 Outputs:
     ConfigAggregatorId:
-      Value: !If [CreateAggregator, !Ref Aggregator, !Ref AggregatorId]
+      Value: !Ref Aggregator

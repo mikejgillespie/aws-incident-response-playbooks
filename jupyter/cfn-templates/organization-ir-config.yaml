@@ -7,17 +7,14 @@ Parameters:
   AutomateRemediationTemplateUrl:
     Type: String
     Description: The URL of the S3 location that contains the auto remediation stack.
-  RegionList:
-    Type: String
   OrgUnitId:
     Type: String
   OutputFormat:
     Type: String
     Default: plain-text
-  ConfigTopic:
+  RegionList:
     Type: String
-  ConfigBucket:
-    Type: String
+    Default: us-east-1
 Resources:
   AccountLevelStackSet:
     Type: AWS::CloudFormation::StackSet
@@ -36,8 +33,6 @@ Resources:
         Regions:
           - us-east-1
       Parameters: 
-        - ParameterKey: ConfigRecorderRoleName
-          ParameterValue: !Sub ${AWS::StackName}-config-recorder
         - ParameterKey: ConfigRemediationRoleName
           ParameterValue: !Sub ${AWS::StackName}-config-remediation
       StackSetName: !Sub ${AWS::StackName}-account
@@ -61,10 +56,6 @@ Resources:
             - !Ref OrgUnitId
         Regions: !Split [",", !Ref RegionList]
       Parameters: 
-        - ParameterKey: ConfigTopic
-          ParameterValue: !Ref ConfigTopic
-        - ParameterKey: ConfigBucket
-          ParameterValue: !Ref ConfigBucket
         - ParameterKey: CustomConfigRuleName
           ParameterValue: ConfigRuleForEnableVpcFlowLogs
         - ParameterKey: OutputFormat
@@ -75,8 +66,6 @@ Resources:
           ParameterValue: One_Hour
         - ParameterKey: CentralizedS3LoggingBucket
           ParameterValue: !Ref FlowLogsBucket   
-        - ParameterKey: ConfigRecorderRole
-          ParameterValue: !Sub ${AWS::StackName}-config-recorder
         - ParameterKey: ConfigRemediationRole
           ParameterValue: !Sub ${AWS::StackName}-config-remediation
       StackSetName: !Sub ${AWS::StackName}-regions
