@@ -16,6 +16,54 @@ Parameters:
     Type: String
     Default: us-east-1
 Resources:
+  MgmtAccountLevelStackSet:
+    Type: AWS::CloudFormation::StackSet
+    Properties: 
+      Capabilities: 
+        - CAPABILITY_NAMED_IAM
+      Description: Stackset to deploy to reach region in the account
+      PermissionModel: SELF_MANAGED
+      StackInstancesGroup:
+      - DeploymentTargets: 
+          Accounts:
+            - !Ref AWS::AccountId
+        Regions:
+          - us-east-1
+      Parameters: 
+        - ParameterKey: ConfigRemediationRoleName
+          ParameterValue: !Sub ${AWS::StackName}-config-remediation
+      StackSetName: !Sub ${AWS::StackName}-mgmt-account
+      TemplateURL: !Sub ${AutomateRemediationTemplateUrl}/account-configurations.yaml
+  MgmtRegionLevelStackSet:
+    Type: AWS::CloudFormation::StackSet
+    DependsOn: AccountLevelStackSet
+    Properties: 
+      Capabilities: 
+        - CAPABILITY_IAM
+      Description: Stackset to deploy to reach region in the account
+      Parameters: 
+        - CustomConfigRuleName
+      PermissionModel: SELF_MANAGED
+      StackInstancesGroup:
+      - DeploymentTargets: 
+          Accounts:
+            - !Ref AWS::AccountId
+        Regions: !Split [",", !Ref RegionList]
+      Parameters: 
+        - ParameterKey: CustomConfigRuleName
+          ParameterValue: ConfigRuleForEnableVpcFlowLogs
+        - ParameterKey: OutputFormat
+          ParameterValue: !Ref OutputFormat
+        - ParameterKey: TrafficType
+          ParameterValue: ALL
+        - ParameterKey: MaxExecutionFrequency
+          ParameterValue: One_Hour
+        - ParameterKey: CentralizedS3LoggingBucket
+          ParameterValue: !Ref FlowLogsBucket   
+        - ParameterKey: ConfigRemediationRole
+          ParameterValue: !Sub ${AWS::StackName}-config-remediation
+      StackSetName: !Sub ${AWS::StackName}-mgmt-regions
+      TemplateURL: !Sub ${AutomateRemediationTemplateUrl}/region-account-configurations.yaml
   AccountLevelStackSet:
     Type: AWS::CloudFormation::StackSet
     Properties: 

@@ -23,14 +23,13 @@ def deploy(stack_name, role, account, template, capabilities="CAPABILITY_IAM", r
     process = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     link = ""
     
-    cnt = 1
+    cnt = 0
     
     while True:
         cnt+=1
         rc = process.poll()
+        
         output = process.stdout.readline()
-        
-        
         while output:
             txt_output = output.strip().decode('utf-8')
             print(f"{txt_output}")
@@ -58,7 +57,8 @@ def deploy(stack_name, role, account, template, capabilities="CAPABILITY_IAM", r
         if len(cfn_response['Stacks']) > 0:
             stack = cfn_response['Stacks'][0]
             retval["Status"] = stack["StackStatus"]
-            for output in stack['Outputs']:     
-                retval["Outputs"][output['OutputKey']] = output['OutputValue']
+            if 'Outputs' in stack:
+                for output in stack['Outputs']:     
+                    retval["Outputs"][output['OutputKey']] = output['OutputValue']
     
     return retval

@@ -194,4 +194,4 @@ sso.login(role, aws_account)
 
 ## Configure the **AWS Organizations**
 
-Lastly, baseline your AWS organization be executing the [configure-aws-organization](configure-aws-organization.ipynb) notebook.
+Lastly, check the configuration of the logs using  [check-organization-readiness](check-organization-readiness.ipynb) notebook.

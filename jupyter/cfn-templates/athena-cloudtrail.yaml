@@ -1,0 +1,253 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Creates the flow logs Athena table
+Parameters:
+  DatabaseName:
+    Type: String
+    Description: The database name for the Athena tables
+  CloudTrailLogsBucketPath:
+    Type: String
+    Description: The Name of the S3 bucket that contains the CloudTrail logs.
+  CloudTrailTableName:
+    Type: String
+    Description: The table name for the Athena CloudTrail tables
+  FlowLogsBucketPath:
+    Type: String
+    Description: The Name of the S3 bucket that contains the CloudTrail logs.
+  FlowLogsTableName:
+    Type: String
+    Description: The table name for the Athena CloudTrail tables
+  RegionList:
+    Type: String
+  FlowLogsFormat:
+    Type: String
+Conditions:
+  FlowLogsParquet: !Equals 
+    - !Ref FlowLogsFormat
+    - 'parquet'
+  CreateCloudTrailTable: !Not [!Equals [!Ref CloudTrailTableName, '']]
+  CreateFlowLogsTable: !Not [!Equals [!Ref FlowLogsTableName, '']]
+Resources:
+  CFNDatabaseAuditLogs:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Ref DatabaseName 
+        Description: Database to hold tables for CloudTrail data
+  CFNTableCloudTrail:
+    DependsOn: CFNDatabaseAuditLogs
+    Condition: CreateCloudTrailTable
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref DatabaseName
+      TableInput:
+        Name: !Ref CloudTrailTableName
+        Description: The organization wide cloudtrail logs
+        TableType: EXTERNAL_TABLE
+        Parameters:
+          "projection.enabled": "true"
+          "projection.enabled": "true" 
+          "storage.location.template":  
+            !Sub ${CloudTrailLogsBucketPath}/${!accountid}/CloudTrail/${!region}/${!timestamp}/
+          "projection.accountid.type": "injected"
+          "projection.region.type": "enum"
+          "projection.region.values": !Ref RegionList
+          "projection.timestamp.format": "yyyy/MM/dd"
+          "projection.timestamp.interval": "1"
+          "projection.timestamp.interval.unit": "DAYS"
+          "projection.timestamp.range": "2020/01/01,NOW"
+          "projection.timestamp.type": "date"
+        PartitionKeys:
+        # Data is partitioned by month
+        - Name: accountid
+          Type: string
+        - Name: region
+          Type: string
+        - Name: timestamp
+          Type: string                    
+        StorageDescriptor:
+          Columns:
+            - Name: eventversion
+              Type: string
+              Comment: ''
+            - Name: useridentity
+              Type: struct<Type:string,principalid:string,arn:string,accountid:string,invokedby:string,accesskeyid:string,userName:string,sessioncontext:struct<attributes:struct<mfaauthenticated:string,creationdate:string>,sessionissuer:struct<Type:string,principalId:string,arn:string,accountId:string,userName:string>>>
+              Comment: ''
+            - Name: eventtime
+              Type: string
+              Comment: ''
+            - Name: eventsource
+              Type: string
+              Comment: ''
+            - Name: eventName
+              Type: string
+              Comment: ''
+            - Name: awsregion
+              Type: string
+              Comment: ''
+            - Name: sourceipaddress
+              Type: string
+              Comment: ''
+            - Name: useragent
+              Type: string
+              Comment: ''
+            - Name: errorcode
+              Type: string
+              Comment: ''
+            - Name: errormessage
+              Type: string
+              Comment: ''
+            - Name: requestparameters
+              Type: string
+              Comment: ''
+            - Name: responseelements
+              Type: string
+              Comment: ''
+            - Name: additionaleventdata
+              Type: string
+              Comment: ''
+            - Name: requestid
+              Type: string
+              Comment: ''
+            - Name: eventid
+              Type: string
+              Comment: ''
+            - Name: resources
+              Type: array<struct<ARN:string,accountId:string,Type:string>>
+              Comment: ''
+            - Name: eventType
+              Type: string
+              Comment: ''
+            - Name: apiversion
+              Type: string
+              Comment: ''
+            - Name: readonly
+              Type: string
+              Comment: ''
+            - Name: recipientaccountid
+              Type: string
+              Comment: ''
+            - Name: serviceeventdetails
+              Type: string
+              Comment: ''
+            - Name: sharedeventid
+              Type: string
+              Comment: ''
+            - Name: vpcendpointid
+              Type: string
+              Comment: ''
+          Location: !Ref CloudTrailLogsBucketPath
+          InputFormat: com.amazon.emr.cloudtrail.CloudTrailInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Compressed: false
+          SerdeInfo:
+            SerializationLibrary: com.amazon.emr.hive.serde.CloudTrailSerde
+            Parameters:
+              serialization.format: '1'
+          StoredAsSubDirectories: false
+  CFNTableFlowLogs:
+    # Creating the table waits for the database to be created
+    Type: AWS::Glue::Table
+    Condition: CreateFlowLogsTable
+    DependsOn: CFNDatabaseAuditLogs
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref DatabaseName
+      TableInput:
+        Name: vpc_flow_logs
+        Description: The organization wide vpc flow logs
+        TableType: EXTERNAL_TABLE
+        Parameters:
+          "projection.enabled": "true"
+          "projection.enabled": "true" 
+          "storage.location.template":  !Sub ${FlowLogsBucketPath}/${!accountid}/vpcflowlogs/${!region}/${!timestamp}/
+          "projection.accountid.type": "injected"
+          "projection.region.type": "enum"
+          "projection.region.values": !Ref RegionList
+          "projection.timestamp.format": "yyyy/MM/dd"
+          "projection.timestamp.interval": "1"
+          "projection.timestamp.interval.unit": "DAYS"
+          "projection.timestamp.range": "2020/01/01,NOW"
+          "projection.timestamp.type": "date"
+          "skip.header.line.count": !If
+            - FlowLogsParquet
+            - !Ref AWS::NoValue
+            - '1'
+        PartitionKeys:
+        # Data is partitioned by month
+        - Name: accountid
+          Type: string
+        - Name: region
+          Type: string
+        - Name: timestamp
+          Type: string                       
+        StorageDescriptor:
+          Columns:
+            - Name: version
+              Type: int
+              Comment: ''
+            - Name: account_id
+              Type: string
+              Comment: ''
+            - Name: interface_id
+              Type: string
+              Comment: ''
+            - Name: srcaddr
+              Type: string
+              Comment: ''
+            - Name: dstaddr
+              Type: string
+              Comment: ''
+            - Name: srcport
+              Type: int
+              Comment: ''
+            - Name: dstport
+              Type: int
+              Comment: ''
+            - Name: protocol
+              Type: bigint
+              Comment: ''
+            - Name: packets
+              Type: bigint
+              Comment: ''
+            - Name: bytes
+              Type: bigint
+              Comment: ''
+            - Name: start
+              Type: bigint
+              Comment: ''
+            - Name: end
+              Type: bigint
+              Comment: ''
+            - Name: action
+              Type: string
+              Comment: ''
+            - Name: log_status
+              Type: string
+              Comment: ''
+          Location: !Sub ${FlowLogsBucketPath}/
+          InputFormat: !If
+          - FlowLogsParquet
+          - 'org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat'
+          - 'org.apache.hadoop.mapred.TextInputFormat'
+          OutputFormat: !If
+          - FlowLogsParquet
+          - 'org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat'
+          - 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
+          Compressed: false
+          SerdeInfo:
+            SerializationLibrary:  !If
+              - FlowLogsParquet
+              - 'org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe'
+              - 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe'            
+            Parameters:
+              "serialization.format":  !If
+                - FlowLogsParquet
+                - '1'
+                - ' '
+              "field.delim": !If
+                - FlowLogsParquet
+                - !Ref AWS::NoValue
+                - ' '
+          StoredAsSubDirectories: false
