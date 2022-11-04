@@ -35,7 +35,10 @@ def get_management_session(permission_set):
     account_id = os.environ.get('MANAGEMENT_ACCOUNT')
     return get_session(permission_set, account_id)
 
-def get_session(permission_set, account_id, region_name='us-east-1'):
+def get_session(permission_set, account_id='', region_name='us-east-1'):
+    if account_id=="":
+        account_id = os.environ.get('LOGGING_ACCOUNT')
+        
     profile = f"{permission_set}-{account_id}"
     
     init_profiles(permission_set, account_id)
@@ -235,18 +238,30 @@ def logout():
             # This is ok, we're logging out.
             pass
     
-    
 
-def fetch_accouts_credentials_orig(access_token):
-    config = read_config(AWS_CONFIG_PATH)
-    print("Updating config")
+def print_permissions():
+    access_token = ""
     
-    credentials = []
+    file_paths = list_directory(AWS_SSO_CACHE_PATH)
+    for file_path in file_paths:
+        data = load_json(file_path)
+        if not (data.get("startUrl") and data.get("startUrl").startswith(sso_start_url)) or\
+                data.get("region") != aws_region or iso_time_now() > parse_timestamp(data["expiresAt"]):
+            continue
+        client_config = Config(signature_version=UNSIGNED, region_name='us-east-1')
+        sso = boto3.client("sso", config=client_config)
+        
+        access_token = data['accessToken']
+
+
+    if access_token == "":
+        print("No Access Token, please log in")
+        return;
+    
     client_config = Config(signature_version=UNSIGNED, region_name='us-east-1')
     sso = boto3.client("sso", config=client_config)
     paginator = sso.get_paginator('list_accounts')
     results = paginator.paginate(accessToken=access_token)
-    print("Fetching accounts available for logged in user:")
     account_list = results.build_full_result()['accountList']
     for account in account_list:
         sso_account_id = account['accountId']
@@ -262,20 +277,6 @@ def fetch_accouts_credentials_orig(access_token):
         for role in role_list:
             print(f"Account: {role['accountId']}: Role: {role['roleName']}")
         
-            profile_name = f"profile {role['roleName']}-{role['accountId']}"
-            if config.has_section(profile_name):
-                config.remove_section(profile_name)
-            config.add_section(profile_name)
-            config.set(profile_name, "sso_start_url", f"{sso_start_url}")
-            config.set(profile_name, "sso_region ", f"{aws_region}")
-            config.set(profile_name, "sso_account_id", f"{role['accountId']}")
-            config.set(profile_name, "sso_role_name", f"{role['roleName']}")
-            config.set(profile_name, "region", f"{aws_region}")
-
-    write_config(AWS_CONFIG_PATH, config)
-    
-
-
 '''
 - You need botocore and boto3 with python3
 - Exec this with python path/to/this/file.py
@@ -288,6 +289,5 @@ def sso_login(force_login = False):
         logout()
         
     access_token = fetch_access_token()
-    #fetch_accouts_credentials_orig(access_token)
 
     return access_token
