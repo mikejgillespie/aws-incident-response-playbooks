@@ -155,7 +155,7 @@ Resources:
       CatalogId: !Ref AWS::AccountId
       DatabaseName: !Ref DatabaseName
       TableInput:
-        Name: vpc_flow_logs
+        Name: !Ref FlowLogsTableName
         Description: The organization wide vpc flow logs
         TableType: EXTERNAL_TABLE
         Parameters:
@@ -251,3 +251,25 @@ Resources:
                 - !Ref AWS::NoValue
                 - ' '
           StoredAsSubDirectories: false
+  DatabaseParameter:
+    Type: AWS::SSM::Parameter
+    Properties: 
+      Description: This contains the athena table name for cloudtrail logs
+      Type: String
+      Name: Jupyter-Athena-Glue-Database
+      Value: !Ref DatabaseName
+  CloudTrailTableNameParameter:
+    Type: AWS::SSM::Parameter
+    Properties: 
+      Description: This contains the athena table name for cloudtrail logs
+      Type: String
+      Name: Jupyter-Athena-CloudTrail-Table
+      Value: !Ref CloudTrailTableName
+  CloudTrailTableNameParameter:
+    Type: AWS::SSM::Parameter
+    Condition: CreateFlowLogsTable
+    Properties: 
+      Description: This contains the athena table name for flow logs
+      Type: String
+      Name: Jupyter-Athena-FlowLogs-Table
+      Value: !Ref FlowLogsTableName
