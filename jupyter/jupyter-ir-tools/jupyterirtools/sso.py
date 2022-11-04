@@ -8,7 +8,7 @@ import json
 from configparser import ConfigParser
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-import dateutil, time, binascii, hashlib
+import dateutil, time, binascii, hashlib, math
 from botocore import UNSIGNED
 from botocore.config import Config
 
@@ -19,15 +19,16 @@ AWS_SSO_CACHE_PATH = f"{Path.home()}/.aws/sso/cache"
 sso_start_url = os.environ['SSO_URL']
 aws_region = os.environ['SSO_REGION']
     
-def login(permission_set = '', account_id=''):
+def login(permission_set = '', account_id='', force_login = False):
     
     if account_id=="":
         account_id = os.environ.get('LOGGING_ACCOUNT')
     
-    sso_login()
+    sso_login(force_login)
     
     if permission_set != '':
         os.environ["AWS_PROFILE"] = f"{permission_set}-{account_id}"
+        init_profiles(permission_set, account_id)
     
 
 def get_management_session(permission_set):
@@ -41,55 +42,23 @@ def get_session(permission_set, account_id, region_name='us-east-1'):
 
     return boto3.session.Session(profile_name=profile, region_name=region_name)
     
-    
-def run_command(command):
-    process = subprocess.Popen(shlex.split(command), stdout=subprocess.PIPE)
-    state = "initialize" 
-    link = ""
-    while True:
-        output = process.stdout.readline()
-        rc = process.poll()
-        if rc is not None:
-            break
-        if output:
-            txt_output = output.strip().decode('utf-8')
-            if state == "await_code" and txt_output != "":
-                state = "await_login" 
-                link = f"{link}?user_code={txt_output}"
-                print(f"If the windows doesn't automatically open, click on this {link} to activate the session")
-                display(Javascript(f"window.open('{link}')"))
-            elif state == "initialize" and txt_output.startswith("https"):
-                link = f"{txt_output}"
-            elif state == "initialize" and txt_output.startswith("Then enter the code:"):
-                state = "await_code"
-            #else:    
-                #print(f"{txt_output}")
-    rc = process.poll()
-    return rc
 
 def init_profiles(permission_set, account_id):
-
-    if os.path.isfile(os.path.expanduser('~') + "/.aws/config"):
-        with open(os.path.expanduser('~') + "/.aws/config") as myfile:
-            if f'{permission_set}-{account_id}' in myfile.read():
-                #print("Profile found")
-                return
+    config = read_config(AWS_CONFIG_PATH)
+    print("Updating config")
+        
+    profile_name = f"profile {permission_set}-{account_id}"
+    if config.has_section(profile_name):
+        config.remove_section(profile_name)
+    config.add_section(profile_name)
+    config.set(profile_name, "sso_start_url", f"{sso_start_url}")
+    config.set(profile_name, "sso_region ", f"{aws_region}")
+    config.set(profile_name, "sso_account_id", f"{account_id}")
+    config.set(profile_name, "sso_role_name", f"{permission_set}")
+    config.set(profile_name, "region", f"{aws_region}")
+            
+    write_config(AWS_CONFIG_PATH, config)
     
-    
-    profile_name = f"{permission_set}-{account_id}"
-    cr = '\n'
-    aws_config = f"[profile {profile_name}]{cr}"
-    aws_config += f"sso_start_url = {os.environ['SSO_URL']}{cr}"
-    aws_config += f"sso_region ={os.environ['SSO_REGION']}{cr}"
-    aws_config += f"sso_account_id = {account_id}{cr}"
-    aws_config += f"sso_role_name = {permission_set}{cr}"
-    aws_config += f"region = {os.environ['SSO_REGION']}{cr}"
-    aws_config += '\n'
-
-    f = open(os.path.expanduser('~') + "/.aws/config", "a")
-    f.write(aws_config)
-    f.close()
-    #print(aws_config)
 def get_sso_cached_login():
     file_paths = list_directory(AWS_SSO_CACHE_PATH)
     for file_path in file_paths:
@@ -97,8 +66,6 @@ def get_sso_cached_login():
         if not (data.get("startUrl") and data.get("startUrl").startswith(sso_start_url)) or\
                 data.get("region") != aws_region or iso_time_now() > parse_timestamp(data["expiresAt"]):
             continue
-        print("Using cached credentials")
-        
         client_config = Config(signature_version=UNSIGNED, region_name='us-east-1')
         sso = boto3.client("sso", config=client_config)
         
@@ -107,6 +74,14 @@ def get_sso_cached_login():
         except sso.exceptions.UnauthorizedException:
             raise ExpiredSSOCredentialsError("Current cached SSO login is expired or invalid")
 
+        diff = parse_timestamp(data["expiresAt"]) - iso_time_now()
+        minutes = int(diff.total_seconds() / 60)
+        hours = math.floor(minutes/60)
+        minutes = minutes % 60
+        
+        print(f'Credentials expire in {hours} hours and {minutes} minutes')
+        
+        
         return data['accessToken']
     raise ExpiredSSOCredentialsError("Current cached SSO login is expired or invalid")
 
@@ -170,6 +145,7 @@ class ExpiredSSOCredentialsError(Exception):
 
 
 def fetch_access_token():
+
     try:
         return get_sso_cached_login()
     except ExpiredSSOCredentialsError as error:
@@ -218,6 +194,13 @@ def renew_access_token():
             access_token = create_token_response['accessToken']
             login_waiting = False
             
+            diff = parse_timestamp(expiration_date_iso) - iso_time_now()
+            minutes = int(diff.total_seconds() / 60)
+            hours = math.floor(minutes/60)
+            minutes = minutes % 60
+        
+            print(f'Credentials expire in {hours} hours and {minutes} minutes')
+            
             with open(f'{AWS_SSO_CACHE_PATH}/{client_hash_filename}', 'w') as cache_file:
                 cache_file.write(json.dumps({
                     'accessToken': access_token,
@@ -230,6 +213,7 @@ def renew_access_token():
         except Exception as err:
             print(f"Unexpected {err}, {type(err)}")
 
+    print("Login Successful")
     return access_token
 
 def fetch_accouts_credentials():
@@ -237,11 +221,21 @@ def fetch_accouts_credentials():
 
 def logout():
     
-    access_token = fetch_access_token()
+    file_paths = list_directory(AWS_SSO_CACHE_PATH)
+    for file_path in file_paths:
+        data = load_json(file_path)
+        if not (data.get("startUrl") and data.get("startUrl").startswith(sso_start_url)) or\
+                data.get("region") != aws_region or iso_time_now() > parse_timestamp(data["expiresAt"]):
+            continue
+        client_config = Config(signature_version=UNSIGNED, region_name='us-east-1')
+        sso = boto3.client("sso", config=client_config)
+        
+        try:
+            sso.logout(accessToken=data['accessToken'])
+        except sso.exceptions.UnauthorizedException:
+            # This is ok, we're logging out.
+            pass
     
-    client_config = Config(signature_version=UNSIGNED, region_name='us-east-1')
-    sso = boto3.client("sso", config=client_config)
-    sso.logout(accessToken=access_token)
     
 
 def fetch_accouts_credentials_orig(access_token):
@@ -280,6 +274,7 @@ def fetch_accouts_credentials_orig(access_token):
             config.set(profile_name, "region", f"{aws_region}")
 
     write_config(AWS_CONFIG_PATH, config)
+    
 
 
 '''
@@ -288,9 +283,12 @@ def fetch_accouts_credentials_orig(access_token):
 - I'll get default values for sso_region and sso_start_url from your ~/.aws/config file, you can overwrite it anyways when you run the script
 - It updates ~/.aws/credentials will all credentials assigned in your SSO account
 '''
-def sso_login():
+def sso_login(force_login = False):
     
+    if force_login:
+        logout()
+        
     access_token = fetch_access_token()
-    fetch_accouts_credentials_orig(access_token)
+    #fetch_accouts_credentials_orig(access_token)
 
     return access_token
