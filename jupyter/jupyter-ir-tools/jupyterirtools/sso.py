@@ -45,8 +45,7 @@ def get_session(permission_set, account_id, region_name='us-east-1'):
 
 def init_profiles(permission_set, account_id):
     config = read_config(AWS_CONFIG_PATH)
-    print("Updating config")
-        
+    
     profile_name = f"profile {permission_set}-{account_id}"
     if config.has_section(profile_name):
         config.remove_section(profile_name)
