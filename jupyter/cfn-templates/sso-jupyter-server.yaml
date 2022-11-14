@@ -26,25 +26,9 @@ Resources:
             set -e
 
             sudo -u ec2-user -i <<'EOF'
-            unset SUDO_UID
-            # Install a separate conda installation via Miniconda
-            WORKING_DIR=/home/ec2-user/SageMaker/custom-miniconda
-            mkdir -p "$WORKING_DIR"
-            wget https://repo.anaconda.com/miniconda/Miniconda3-4.6.14-Linux-x86_64.sh -O "$WORKING_DIR/miniconda.sh"
-            bash "$WORKING_DIR/miniconda.sh" -b -u -p "$WORKING_DIR/miniconda" 
-            rm -rf "$WORKING_DIR/miniconda.sh"
-            # Create a custom conda environment
-            source "$WORKING_DIR/miniconda/bin/activate"
-            KERNEL_NAME="incident_response"
-            PYTHON="3.8"
-            conda create --yes --name "$KERNEL_NAME" python="$PYTHON"
-            conda activate "$KERNEL_NAME"
-            pip install --quiet ipykernel
-            # Customize these lines as necessary to install the required packages
-            conda install --yes numpy
-            pip install --quiet boto3 pyathena
+            cd /home/ec2-user/SageMaker
+            git clone https://github.com/mikejgillespie/aws-incident-response-playbooks
             EOF
-
       OnStart:
       - Content:
           Fn::Base64: !Sub |
@@ -70,20 +54,19 @@ Resources:
             echo "export LOGGING_ACCOUNT=${LoggingAccount}" >> /etc/profile.d/jupyter-env.sh
             echo "export SSO_URL=${SsoUrl}" >> /etc/profile.d/jupyter-env.sh
             echo "export SSO_REGION=${SsoRegion}" >> /etc/profile.d/jupyter-env.sh
-            initctl restart jupyter-server --no-wait
+            #initctl restart jupyter-server --no-wait
 
             sudo -u ec2-user -i <<'EOF'
-            unset SUDO_UID
-            WORKING_DIR=/home/ec2-user/SageMaker/custom-miniconda/
-            source "$WORKING_DIR/miniconda/bin/activate"
-            for env in $WORKING_DIR/miniconda/envs/*; do
-                BASENAME=$(basename "$env")
-                source activate "$BASENAME"
-                python -m ipykernel install --user --name "$BASENAME" --display-name "$BASENAME (Python3)"
-            done
-            # Optionally, uncomment these lines to disable SageMaker-provided Conda functionality.
-            # echo "c.EnvironmentKernelSpecManager.use_conda_directly = False" >> /home/ec2-user/.jupyter/jupyter_notebook_config.py
-            # rm /home/ec2-user/.condarc
+
+            PACKAGE=pyathena
+            ENVIRONMENT=python3
+            source /home/ec2-user/anaconda3/bin/activate "$ENVIRONMENT"
+            rm  /home/ec2-user/anaconda3/envs/python3/bin/aws
+            pip install --upgrade "$PACKAGE"
+            pip install -e /home/ec2-user/SageMaker/aws-incident-response-playbooks/jupyter/jupyter-ir-tools
+            source /home/ec2-user/anaconda3/bin/deactivate
+
+
             EOF
 
             echo "Restarting the Jupyter server.."
@@ -94,7 +77,7 @@ Resources:
       InstanceType: "ml.t2.large"
       RoleArn: !GetAtt ExecutionRole.Arn
       LifecycleConfigName: !GetAtt BasicNotebookInstanceLifecycleConfig.NotebookInstanceLifecycleConfigName
-      DefaultCodeRepository: https://github.com/mikejgillespie/aws-incident-response-playbooks
+      
   ExecutionRole: 
     Type: "AWS::IAM::Role"
     Properties: 
@@ -144,19 +127,7 @@ Resources:
                   - "ssm:GetParameter"
                 Resource: 
                 - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/Jupyter-*
-        - 
-          PolicyName: "sagemaker-notebook-policy"
-          PolicyDocument: 
-            Version: "2012-10-17"
-            Statement: 
-              - Effect: "Allow"
-                Action: 
-                  - "s3:GetObject"
-                  - "s3:PutObject"
-                  - "s3:ListBucket"
-                Resource: 
-                - 'arn:aws:s3:::{{resolve:ssm:Jupyter-S3}}'
-                - 'arn:aws:s3:::{{resolve:ssm:Jupyter-S3}}/*'
+
 Outputs:
   BasicNotebookInstanceId:
     Value: !Ref BasicNotebookInstance
