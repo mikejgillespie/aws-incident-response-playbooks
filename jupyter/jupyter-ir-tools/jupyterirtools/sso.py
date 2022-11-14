@@ -72,6 +72,7 @@ def get_sso_cached_login():
         sso = boto3.client("sso", config=client_config)
         
         try:
+            print(f"accessToken: {data['accessToken']}")
             accounts = sso.list_accounts(accessToken=data['accessToken'], maxResults=1)
         except sso.exceptions.UnauthorizedException:
             raise ExpiredSSOCredentialsError("Current cached SSO login is expired or invalid")
