@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  Configures the a non-SSO account to have roles that align with the Jupyter-IR Runbooks
+Parameters:
+  JumpAccount:
+    Type: String
+Resources:
+  SysAdminRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      Description: SysAdmin permissions for Jupyter incident response notebooks
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Ref JumpAccount
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns: 
+        -  arn:aws:iam::aws:policy/job-function/SystemAdministrator
+      RoleName: Jupyter-IR-SysAdminAccess
+  AdministratorRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      Description: Admin permissions for Jupyter incident response notebooks
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub JumpAccount
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns: 
+        -  arn:aws:iam::aws:policy/AdministratorAccess
+      RoleName: Jupyter-IR-AdministratorAccess
+  ViewOnlyRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      Description: Read-only role for Jupyter incident response notebooks
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Ref JumpAccount
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/job-function/ViewOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonAthenaFullAccess
+      RoleName: Jupyter-IR-ViewOnly

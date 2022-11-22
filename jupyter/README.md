@@ -84,23 +84,7 @@ aws cloudformation deploy --capabilities CAPABILITY_IAM --template-file sso-jupy
 Skip ahead to **Verifying The Jupyter Lab Server**
 
 #### Local
-The machine will need access to the [AWS CLI 2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html), and the default profile has access to the management account of IAM Identity Center.
-
-Identity Center Permissions
-* sso:ListPermissionSets
-* sso:ListAccountsForProvisionedPermissionSet
-* sso:DescribePermissionSet
-
-SSM Permissions:
-The notebook server will need `GetParameter` permissions on the following SSM Parameters:
-* Jupyter-*
-
-S3
-The notebook server will need the following access to the shared S3 bucket for the Notebooks. The name of the Bucket is an ssm parameter in S3.
-* s3:GetObject
-* s3:PutObject
-* s3:ListBucket
-
+Jupyter can be installed locally and configured to run with the 
 
 ##### MacOS
 **Start in the project directory**
@@ -120,12 +104,13 @@ Add the environment variables to your ~/.bash_profile or ~/.zshrc file depending
 
 Starting with macOS Catalina (10.15), Apple set the default shell to the Z shell (zsh). In previous macOS versions, the default was Bash.
 
-Add these lines to your ~/.zshrc file for zsh and ~/.bash_profile for bash:
+Add these lines to your ~/.zshrc file for zsh and ~/.bash_profile for bash. Note: The jump account is used to assume roles in non-AWS Organizations accounts, see section 'Optional - Include accounts outside the AWS Organization'.
 ```
 export LOGGING_ACCOUNT=<LOGGING_ACCOUNT_ID>
 export SSO_URL=<SSO LOGIN URL>
 export SSO_REGION=<SSO REGION>
 export MANAGEMENT_ACCOUNT=<MANAGEMENT_ACCOUNT_ID>
+export JUMP_ACCOUNT=<JUMP_ACCOUNT_ID>
 ```
 
 Restart your terminal window so these changes take effect.
@@ -154,12 +139,13 @@ Install the CLI v2:
 msiexec.exe /i https://awscli.amazonaws.com/AWSCLIV2.msi
 ```
 
-Set the environment variables for the SSO environment
+Set the environment variables for the SSO environment. Note: The jump account is used to assume roles in non-AWS Organizations accounts, see section 'Optional - Include accounts outside the AWS Organization'.
 ```
 setx LOGGING_ACCOUNT <LOGGING_ACCOUNT_ID>
 setx SSO_URL <SSO LOGIN URL>
 setx SSO_REGION <SSO REGION>
 setx MANAGEMENT_ACCOUNT <MANAGEMENT_ACCOUNT_ID>
+setx JUMP_ACCOUNT <JUMP_ACCOUNT_ID>
 ```
 
 then install jupyterlab and 
@@ -192,6 +178,18 @@ from jupyterirtools import sso
 sso.login(role, aws_account)
 ```
 
-## Configure the **AWS Organizations**
+## Configure the AWS Organizations
 
 Lastly, check the configuration of the logs using  [check-organization-readiness](check-organization-readiness.ipynb) notebook.
+
+## Optional - Include accounts outside the AWS Organization
+If there are any accounts that are outside of the AWS organization that you could like to execute runbooks, create a CloudFormation stack with the [non-sso-account.yaml](cfn-templates/non-sso-account.yaml) template.
+
+This could be useful to have runbooks to help onboard an account into the Organization, or any time the account intentionally resides outside the organization. The runbook sso library will first attempt to assume the SSO role in the account, when that fails, it will then try to assume the role through the 'jump' account. There is no changes in the runbook needed, as the sso library manages all of the role assumption details. Note: Instead of the management account, another account should be designated as the account that non-SSO accounts inherit permissions.
+
+### Parameters:
+**JumpAccount**: The central account in the AWS organization used to jump to the non-organizational accounts. If an SSO user has access to a permission set in the jump account, they will then have access to corresponding role created in the non-SSO account.
+
+### Security Considerations for non-organizations accounts
+This creates a trust relationship between the jump account and the non-sso account outside of the organization. Thus, any user or role that has access to call sts:AssumeRole in the Jump account can assume the role in the non-sso account.
+

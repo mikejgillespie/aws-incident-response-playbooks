@@ -1,5 +1,6 @@
 import os
 import boto3
+import botocore.exceptions
 import subprocess
 import shlex
 from os.path import exists
@@ -11,6 +12,7 @@ from pathlib import Path
 import dateutil, time, binascii, hashlib, math
 from botocore import UNSIGNED
 from botocore.config import Config
+from pathlib import Path
 
 AWS_CONFIG_PATH = f"{Path.home()}/.aws/config"
 AWS_CREDENTIAL_PATH = f"{Path.home()}/.aws/credentials"
@@ -41,27 +43,61 @@ def get_session(permission_set, account_id='', region_name='us-east-1'):
         
     profile = f"{permission_set}-{account_id}"
     
-    init_profiles(permission_set, account_id)
+    init_profiles_1(permission_set, account_id)
 
     return boto3.session.Session(profile_name=profile, region_name=region_name)
+
+def init_profiles_1(permission_set, account_id):
+    init_profiles(permission_set, account_id, external_account=False)
+    
+    profile_name = f"{permission_set}-{account_id}"
+    
+    validate_session = boto3.session.Session(profile_name=profile_name, region_name='us-east-1')
+    sts = validate_session.client('sts')
+    try:
+        identity = sts.get_caller_identity()
+    except botocore.exceptions.ClientError:
+        init_profiles(permission_set, account_id, external_account=True)
+        
+    return profile_name
+        
+
+def init_profiles(permission_set, account_id, external_account=False):
+    config = read_config(AWS_CONFIG_PATH)
     
 
-def init_profiles(permission_set, account_id):
-    config = read_config(AWS_CONFIG_PATH)
     
     profile_name = f"profile {permission_set}-{account_id}"
     if config.has_section(profile_name):
         config.remove_section(profile_name)
+        
     config.add_section(profile_name)
-    config.set(profile_name, "sso_start_url", f"{sso_start_url}")
-    config.set(profile_name, "sso_region ", f"{aws_region}")
-    config.set(profile_name, "sso_account_id", f"{account_id}")
-    config.set(profile_name, "sso_role_name", f"{permission_set}")
-    config.set(profile_name, "region", f"{aws_region}")
+    if external_account==True:
+ 
+        mgmt_session = get_session(permission_set,os.environ['MANAGEMENT_ACCOUNT'])
+        sts = mgmt_session.client('sts')
+        identity = sts.get_caller_identity()
+        username = identity['UserId'].split(":")[1]
+        
+        config.set(profile_name, "role_arn", f"arn:aws:iam::{account_id}:role/{permission_set}")
+        config.set(profile_name, "source_profile ", f"{permission_set}-{os.environ.get('MANAGEMENT_ACCOUNT')}")
+        config.set(profile_name, "role_session_name ", f"{username}")
+    
+        config.set(profile_name, "region", f"{aws_region}")
+    else:
+        config.set(profile_name, "sso_start_url", f"{sso_start_url}")
+        config.set(profile_name, "sso_region ", f"{aws_region}")
+        config.set(profile_name, "sso_account_id", f"{account_id}")
+        config.set(profile_name, "sso_role_name", f"{permission_set}")
+        config.set(profile_name, "region", f"{aws_region}")
             
     write_config(AWS_CONFIG_PATH, config)
+    return profile_name
     
 def get_sso_cached_login():
+    if not os.path.exists(AWS_SSO_CACHE_PATH):
+        raise ExpiredSSOCredentialsError("Current cached SSO login is expired or invalid")
+        
     file_paths = list_directory(AWS_SSO_CACHE_PATH)
     for file_path in file_paths:
         data = load_json(file_path)
@@ -104,7 +140,7 @@ def list_directory(path):
 
 def load_json(path):
     try:
-        with open(path) as context:
+        with open(path, "r+") as context:
             return json.load(context)
     except ValueError:
         pass  # ignore invalid json
@@ -115,33 +151,22 @@ def parse_timestamp(value):
 
 
 def read_config(path):
+    # create file if it does not exist
+    file = open(path, 'a+')
+    file.close()
+    
     config = ConfigParser()
     config.read(path)
     return config
 
 
 def write_config(path, config):
-    with open(path, "w") as destination:
+    with open(path, "w+") as destination:
         config.write(destination)
 
 
 def role_name(role_data):
     return role_data['roleName']
-
-
-def update_aws_credentials(new_credentials):
-    config = read_config(AWS_CONFIG_PATH)
-    print("Updating credentials")
-    for profile_credential in new_credentials:
-        profile_name = profile_credential['accountName']
-        if config.has_section(profile_name):
-            config.remove_section(profile_name)
-        config.add_section(profile_name)
-        config.set(profile_name, "aws_access_key_id", profile_credential["accessKeyId"])
-        config.set(profile_name, "aws_secret_access_key ", profile_credential["secretAccessKey"])
-        config.set(profile_name, "aws_session_token", profile_credential["sessionToken"])
-    write_config(AWS_CONFIG_PATH, config)
-
 
 class ExpiredSSOCredentialsError(Exception):
     pass
@@ -204,7 +229,9 @@ def renew_access_token():
         
             print(f'Credentials expire in {hours} hours and {minutes} minutes')
             
-            with open(f'{AWS_SSO_CACHE_PATH}/{client_hash_filename}', 'w') as cache_file:
+            Path(AWS_SSO_CACHE_PATH).mkdir(parents=True, exist_ok=True)
+            
+            with open(f'{AWS_SSO_CACHE_PATH}/{client_hash_filename}', 'w+') as cache_file:
                 cache_file.write(json.dumps({
                     'accessToken': access_token,
                     'expiresAt': expiration_date_iso,
@@ -249,6 +276,8 @@ def print_permissions():
         if not (data.get("startUrl") and data.get("startUrl").startswith(sso_start_url)) or\
                 data.get("region") != aws_region or iso_time_now() > parse_timestamp(data["expiresAt"]):
             continue
+        
+        init_profiles("Jupyter-IR-ViewOnly", os.environ.get('MANAGEMENT_ACCOUNT'))
         client_config = Config(signature_version=UNSIGNED, region_name='us-east-1')
         sso = boto3.client("sso", config=client_config)
         
