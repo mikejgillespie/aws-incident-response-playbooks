@@ -14,6 +14,10 @@ Parameters:
   ManagementAccount:
     Type: String
     Description: The 12-digit AWS account ID for the AWS Organizations management account.
+  JumpAccount:
+    Type: String
+    Default: 000000000000
+    Description: "Optional - The 12-digit AWS account ID to assume roles outside of the AWS Organizations management account."
 Resources:
   BasicNotebookInstanceLifecycleConfig:
     Type: "AWS::SageMaker::NotebookInstanceLifecycleConfig"
@@ -54,6 +58,7 @@ Resources:
             echo "export LOGGING_ACCOUNT=${LoggingAccount}" >> /etc/profile.d/jupyter-env.sh
             echo "export SSO_URL=${SsoUrl}" >> /etc/profile.d/jupyter-env.sh
             echo "export SSO_REGION=${SsoRegion}" >> /etc/profile.d/jupyter-env.sh
+            echo "export JUMP_ACCOUNT=${JumpAccount}" >> /etc/profile.d/jupyter-env.sh
             #initctl restart jupyter-server --no-wait
 
             sudo -u ec2-user -i <<'EOF'
