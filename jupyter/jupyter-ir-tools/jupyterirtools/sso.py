@@ -74,13 +74,13 @@ def init_profiles(permission_set, account_id, external_account=False):
     config.add_section(profile_name)
     if external_account==True:
  
-        mgmt_session = get_session(permission_set,os.environ['MANAGEMENT_ACCOUNT'])
+        mgmt_session = get_session(permission_set,os.environ['JUMP_ACCOUNT'])
         sts = mgmt_session.client('sts')
         identity = sts.get_caller_identity()
         username = identity['UserId'].split(":")[1]
         
         config.set(profile_name, "role_arn", f"arn:aws:iam::{account_id}:role/{permission_set}")
-        config.set(profile_name, "source_profile ", f"{permission_set}-{os.environ.get('MANAGEMENT_ACCOUNT')}")
+        config.set(profile_name, "source_profile ", f"{permission_set}-{os.environ.get('JUMP_ACCOUNT')}")
         config.set(profile_name, "role_session_name ", f"{username}")
     
         config.set(profile_name, "region", f"{aws_region}")
