@@ -14,30 +14,47 @@ from botocore import UNSIGNED
 from botocore.config import Config
 from pathlib import Path
 
+# Set global variables for the default location of the AWS config files
 AWS_CONFIG_PATH = f"{Path.home()}/.aws/config"
 AWS_CREDENTIAL_PATH = f"{Path.home()}/.aws/credentials"
 AWS_SSO_CACHE_PATH = f"{Path.home()}/.aws/sso/cache"
 
+# The environment needs to supply the AWS SSO Url and the AWS SSO region in order to connect to SSO.
 sso_start_url = os.environ['SSO_URL']
 aws_region = os.environ['SSO_REGION']
-    
+
 def login(permission_set = '', account_id='', force_login = False):
-    
+    """
+    login does creates an SSO session for the current user. If a session already exists, it will
+    be reused. If supplied, the given permission set and account ID will be used to set the
+    default profile in the AWS CLI and Boto2 SDK.
+
+    :param permission_set: The permission set to use for the default boto3 session
+    :param account_id: The AWS account ID set to use for the default boto3 session
+    :param force_login: If true, invalidates the current SSO session and begins a new one.
+    """    
     if account_id=="":
         account_id = os.environ.get('LOGGING_ACCOUNT')
-    
-    sso_login(force_login)
     
     if permission_set != '':
         os.environ["AWS_PROFILE"] = f"{permission_set}-{account_id}"
         init_profiles(permission_set, account_id)
     
+    sso_login(force_login)    
 
-def get_management_session(permission_set):
-    account_id = os.environ.get('MANAGEMENT_ACCOUNT')
-    return get_session(permission_set, account_id)
-
+# get_sess
 def get_session(permission_set, account_id='', region_name='us-east-1'):
+    """
+    get_session creates a boto3 session for the permission set, account id, and region. 
+    Prior to creating the session, the profile will be configured in the ~/.aws/config file. 
+    This eliminates the need to call aws sso configure for every account and permission set 
+    variation.
+
+    :param permission_set: The permission set to use for the new boto3 session
+    :param account_id: The AWS account ID set to use for the new boto3 session
+    :param region_name: The region name for the new AWS boto3 session.
+    """    
+    
     if account_id=="":
         account_id = os.environ.get('LOGGING_ACCOUNT')
         
@@ -47,7 +64,27 @@ def get_session(permission_set, account_id='', region_name='us-east-1'):
 
     return boto3.session.Session(profile_name=profile, region_name=region_name)
 
+def get_management_session(permission_set):
+    """
+    get_session creates a boto3 session for the given permission set and the management
+    account based on the system variable.
+
+    :param permission_set: The permission set to use for the new boto3 session
+    """  
+    account_id = os.environ.get('MANAGEMENT_ACCOUNT')
+    return get_session(permission_set, account_id)
+
 def init_profiles_1(permission_set, account_id):
+    """
+    init_profiles_1 populates the ~/.aws/config file with the profile for the given
+    permission set and account ID. It will try to connect, and if that fails through SSO, it will try connected 
+    to the account using the Jump account and AssumeRole access. See readme on information on non-AWS Organization
+    accounts.
+
+    :param permission_set: The permission set to use for the new boto3 profile
+    :param account_id: The AWS account ID set to use for the new boto3 profile
+    """    
+        
     init_profiles(permission_set, account_id, external_account=False)
     
     profile_name = f"{permission_set}-{account_id}"
@@ -63,6 +100,17 @@ def init_profiles_1(permission_set, account_id):
         
 
 def init_profiles(permission_set, account_id, external_account=False):
+    """
+    init_profiles populates the ~/.aws/config file with the profile for the given
+    permission set and account ID. It will either create the profile as an SSO profile
+    or through the JUMP_ACCOUNT system variable..
+
+    :param permission_set: The permission set to use for the new boto3 profile
+    :param account_id: The AWS account ID set to use for the new boto3 profile
+    :param external_account: True if this account external to AWS organizations, otherise it is part of the AWS
+    organization
+    """  
+    
     config = read_config(AWS_CONFIG_PATH)
     
 
@@ -95,6 +143,15 @@ def init_profiles(permission_set, account_id, external_account=False):
     return profile_name
     
 def get_sso_cached_login():
+    """
+    get_sso_cached_login attempts to load the active SSO session based on the AWS_SSO_CACHE_PATH.
+    If the cached sso data is valid, it will return that SSO session, otherise it will raise an ExpiredSSOCredentialsError error.
+
+    :param permission_set: The permission set to use for the new boto3 profile
+    :param account_id: The AWS account ID set to use for the new boto3 profile
+    :param external_account: True if this account external to AWS organizations, otherise it is part of the AWS
+    organization
+    """  
     if not os.path.exists(AWS_SSO_CACHE_PATH):
         raise ExpiredSSOCredentialsError("Current cached SSO login is expired or invalid")
         
@@ -126,10 +183,22 @@ def get_sso_cached_login():
 
 
 def iso_time_now():
+    """
+    Returns the current UTC time
+
+    :return: The current UTC time.
+    """  
     return datetime.now(timezone.utc)
 
 
 def list_directory(path):
+    """
+    list_directory returns a list of all the files in a folder.
+
+    :param path: The path to list the files.
+    :return: A list of strings with the full file name.
+    organization
+    """  
     file_paths = []
     if os.path.exists(path):
         file_paths = Path(path).iterdir()
@@ -173,7 +242,12 @@ class ExpiredSSOCredentialsError(Exception):
 
 
 def fetch_access_token():
+    """
+    fetch_access_token returns the access token for this current session.
 
+    :return: The cached access token, otherwise, a new access token is generated.
+    organization
+    """ 
     try:
         return get_sso_cached_login()
     except ExpiredSSOCredentialsError as error:
@@ -183,6 +257,12 @@ def fetch_access_token():
 
 
 def renew_access_token():
+    """
+    renew_access_token uses the boto3 sso-oidc library to create a new SSO session
+
+    :return: The access token of the validated SSO session.
+    organization
+    """  
     client = boto3.client('sso-oidc', region_name = aws_region)
     client_name = 'aws-sso-script'
     client_hash = hashlib.sha1(sso_start_url.encode('utf-8'))
@@ -246,11 +326,11 @@ def renew_access_token():
     print("Login Successful")
     return access_token
 
-def fetch_accouts_credentials():
-    return ""
 
 def logout():
-    
+    """
+    logout invalidates the current SSO session and all new requests will need to be reauthenticated.
+    """     
     file_paths = list_directory(AWS_SSO_CACHE_PATH)
     for file_path in file_paths:
         data = load_json(file_path)
@@ -268,6 +348,9 @@ def logout():
     
 
 def print_permissions():
+    """
+    print_permissions uses the boto3 sso library to list all the account & permission set access the current user has access to.
+    """ 
     access_token = ""
     
     file_paths = list_directory(AWS_SSO_CACHE_PATH)
@@ -307,14 +390,15 @@ def print_permissions():
         for role in role_list:
             print(f"Account: {role['accountId']}: Role: {role['roleName']}")
         
-'''
-- You need botocore and boto3 with python3
-- Exec this with python path/to/this/file.py
-- I'll get default values for sso_region and sso_start_url from your ~/.aws/config file, you can overwrite it anyways when you run the script
-- It updates ~/.aws/credentials will all credentials assigned in your SSO account
-'''
+
 def sso_login(force_login = False):
-    
+    """
+    get_sso_cached_login attempts to load the active SSO session based on the AWS_SSO_CACHE_PATH.
+    If the cached sso data is valid, it will return that SSO session, otherise it will raise an ExpiredSSOCredentialsError error.
+
+    :param force_login: Invalidate tokens to start to force a new login.
+    :return: The current access token for the active SSO session.
+    """     
     if force_login:
         logout()
         
