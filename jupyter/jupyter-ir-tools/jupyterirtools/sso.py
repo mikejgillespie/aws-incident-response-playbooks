@@ -13,6 +13,9 @@ import dateutil, time, binascii, hashlib, math
 from botocore import UNSIGNED
 from botocore.config import Config
 from pathlib import Path
+import urllib, sys
+import requests # 'pip install requests'
+
 
 # Set global variables for the default location of the AWS config files
 AWS_CONFIG_PATH = f"{Path.home()}/.aws/config"
@@ -40,7 +43,7 @@ def login(permission_set = '', account_id='', force_login = False):
         os.environ["AWS_PROFILE"] = f"{permission_set}-{account_id}"
         init_profiles(permission_set, account_id)
     
-    sso_login(force_login)    
+    sso_login(account_id, permission_set, force_login)    
 
 # get_sess
 def get_session(permission_set, account_id='', region_name='us-east-1'):
@@ -391,7 +394,7 @@ def print_permissions():
             print(f"Account: {role['accountId']}: Role: {role['roleName']}")
         
 
-def sso_login(force_login = False):
+def sso_login(account_id, role_name, force_login = False):
     """
     get_sso_cached_login attempts to load the active SSO session based on the AWS_SSO_CACHE_PATH.
     If the cached sso data is valid, it will return that SSO session, otherise it will raise an ExpiredSSOCredentialsError error.
@@ -403,5 +406,56 @@ def sso_login(force_login = False):
         logout()
         
     access_token = fetch_access_token()
-
+    
+    write_console_link(account_id, role_name, access_token)
+    
     return access_token
+
+def write_console_link(account_id, role_name, access_token):
+    sso_client = boto3.client('sso')
+    
+    response = sso_client.get_role_credentials(
+        roleName=role_name,
+        accountId=account_id,
+        accessToken=access_token
+    )
+    # Step 1: Enter the session credentials
+
+    access_key_id = response['roleCredentials']['accessKeyId']
+    secret_access_key = response['roleCredentials']['secretAccessKey']
+    session_token = response['roleCredentials']['sessionToken']
+
+    # Step 2: Format resulting temporary credentials into JSON
+    url_credentials = {}
+    url_credentials['sessionId'] = access_key_id
+    url_credentials['sessionKey'] = secret_access_key
+    url_credentials['sessionToken'] = session_token
+    json_string_with_temp_credentials = json.dumps(url_credentials)
+
+    # Step 3. Make request to AWS federation endpoint to get sign-in token. Construct the parameter string with
+    # the sign-in action request, a 12-hour session duration, and the JSON document with temporary credentials 
+    # as parameters.
+    request_parameters = "?Action=getSigninToken"
+    request_parameters += "&SessionDuration=43200"
+    if sys.version_info[0] < 3:
+        def quote_plus_function(s):
+            return urllib.quote_plus(s)
+    else:
+        def quote_plus_function(s):
+            return urllib.parse.quote_plus(s)
+    request_parameters += "&Session=" + quote_plus_function(json_string_with_temp_credentials)
+    request_url = "https://signin.aws.amazon.com/federation" + request_parameters
+    r = requests.get(request_url)
+    # Returns a JSON document with a single element named SigninToken.
+    signin_token = json.loads(r.text)
+
+    # Step 4: Create URL where users can use the sign-in token to sign in to 
+    # the console. This URL must be used within 15 minutes after the
+    # sign-in token was issued.
+    request_parameters = "?Action=login" 
+    request_parameters += "&Issuer=Example.org" 
+    request_parameters += "&Destination=" + quote_plus_function("https://console.aws.amazon.com/")
+    request_parameters += "&SigninToken=" + signin_token["SigninToken"]
+    request_url = "https://signin.aws.amazon.com/federation" + request_parameters
+
+    display(Markdown(f"Login Successful, click to open [AWS Console]({request_url})"))
