@@ -178,7 +178,7 @@ def get_sso_cached_login():
         hours = math.floor(minutes/60)
         minutes = minutes % 60
         
-        print(f'Credentials expire in {hours} hours and {minutes} minutes')
+        display(Markdown(f'Credentials expire in {hours} hours and {minutes} minutes'))
         
         
         return data['accessToken']
@@ -310,7 +310,7 @@ def renew_access_token():
             hours = math.floor(minutes/60)
             minutes = minutes % 60
         
-            print(f'Credentials expire in {hours} hours and {minutes} minutes')
+            display(Markdown(f'Credentials expire in {hours} hours and {minutes} minutes'))
             
             Path(AWS_SSO_CACHE_PATH).mkdir(parents=True, exist_ok=True)
             
