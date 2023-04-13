@@ -45,6 +45,21 @@ def login(permission_set = '', account_id='', force_login = False):
     
     sso_login(account_id, permission_set, force_login)    
 
+def get_client_by_account_region(role, service, accounts=[], regions=['us-east-1']):
+    result = []
+    
+    for account in accounts:
+        for region in regions:    
+            session = get_session(role,account)
+            
+            result.append({
+                "client": session.client(service, region_name=region),
+                "account": account,
+                "region": region
+            })
+    
+    return result
+    
 # get_sess
 def get_session(permission_set, account_id='', region_name='us-east-1'):
     """
@@ -96,7 +111,7 @@ def init_profiles_1(permission_set, account_id):
     sts = validate_session.client('sts')
     try:
         identity = sts.get_caller_identity()
-    except botocore.exceptions.ClientError:
+    except botocore.exceptions.ClientError as error:
         init_profiles(permission_set, account_id, external_account=True)
         
     return profile_name
@@ -404,16 +419,23 @@ def sso_login(account_id, role_name, force_login = False):
     """     
     if force_login:
         logout()
-        
+    
     access_token = fetch_access_token()
+    
     
     write_console_link(account_id, role_name, access_token)
     
-    return access_token
+
 
 def write_console_link(account_id, role_name, access_token):
+    link_url = get_link_url(account_id, role_name, access_token, "https://console.aws.amazon.com/" )
+    display(Markdown(f"Login Successful, click to open [AWS Console]({link_url})"))
+    
+    
+def get_link_url(account_id, role_name, access_token, destination_url):
     sso_client = boto3.client('sso')
     
+ 
     response = sso_client.get_role_credentials(
         roleName=role_name,
         accountId=account_id,
@@ -458,4 +480,4 @@ def write_console_link(account_id, role_name, access_token):
     request_parameters += "&SigninToken=" + signin_token["SigninToken"]
     request_url = "https://signin.aws.amazon.com/federation" + request_parameters
 
-    display(Markdown(f"Login Successful, click to open [AWS Console]({request_url})"))
+    return request_url
