@@ -19,7 +19,7 @@ QUERY_TIMEOUT = int( os.environ.get('QUERY_TIMEOUT', '120'))
 CATALOG = os.environ.get('CATALOG', "AwsDataCatalog")
 named_queries = None 
 
-def run_named_query(source, queryname, params=[]):
+def run_named_query_with_sql(source, queryname, params=[]):
     global named_queries
     session = boto3.session.Session()
     
@@ -41,7 +41,11 @@ def run_named_query(source, queryname, params=[]):
         
     named_query = named_queries[f"{queryname}_{source}"]
     
-    return run_query(named_query['QueryString'], named_query['Database'], named_query['WorkGroup'], params = params)
+    return [run_query(named_query['QueryString'], named_query['Database'], named_query['WorkGroup'], params = params), named_query['QueryString']]
+
+def run_named_query(source, queryname, params=[]):
+    df, sql = run_named_query_with_sql(source,queryname, params)
+    return df
 
 def run_query(query_string, database="", workgroup="", params = []):
     session = boto3.session.Session()
