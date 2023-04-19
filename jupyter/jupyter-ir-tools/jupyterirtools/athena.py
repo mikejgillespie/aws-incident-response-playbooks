@@ -7,9 +7,17 @@ import json
 import os
 import pandas as pd
 
+def get_default_staging_dir():
+    session = boto3.session.Session()
+    sts_client = session.client('sts')
+    account_id = sts_client.get_caller_identity()["Account"]
+    
+    return "s3://aws-athena-query-results-{}-{}/".format(account_id, session.region_name)
+
+S3_STAGING_DIR = os.environ.get('S3_STAGING_DIR', get_default_staging_dir())
 QUERY_TIMEOUT = int( os.environ.get('QUERY_TIMEOUT', '120'))
 CATALOG = os.environ.get('CATALOG', "AwsDataCatalog")
-named_queries = None
+named_queries = None 
 
 def run_named_query(source, queryname, params=[]):
     global named_queries
@@ -33,32 +41,44 @@ def run_named_query(source, queryname, params=[]):
         
     named_query = named_queries[f"{queryname}_{source}"]
     
-    return run_query_direct(named_query['QueryString'], named_query['Database'], params)
+    return run_query(named_query['QueryString'], named_query['Database'], named_query['WorkGroup'], params = params)
 
-def run_query_direct(query_string, database, params = []):
+def run_query(query_string, database="", workgroup="", params = []):
     session = boto3.session.Session()
     athena_client = session.client('athena')
-    sts_client = session.client('sts')
-    account_id = sts_client.get_caller_identity()["Account"]
-    
-    s3_staging_dir="s3://aws-athena-query-results-{}-{}/".format(account_id, session.region_name)
     
     timeout_seconds = QUERY_TIMEOUT
 
-    response = athena_client.start_query_execution(
-        QueryString=query_string,
-        QueryExecutionContext={
-            "Database": database,
-            "Catalog": CATALOG
-        },
-        ResultConfiguration={
-            'OutputLocation': s3_staging_dir,
+    start_execution_params = {
+        "QueryString": query_string,
+        "ResultConfiguration":{
+            'OutputLocation': S3_STAGING_DIR,
             'AclConfiguration': {
                 'S3AclOption': 'BUCKET_OWNER_FULL_CONTROL'
             }
-        },
-        ExecutionParameters=params
-    )
+        }
+    }
+    
+    if len(params) > 0:
+        start_execution_params["ExecutionParameters"]=params
+        
+    if database != "":
+        if not "QueryExecutionContext" in start_execution_params:
+            start_execution_params["QueryExecutionContext"] = {}
+
+        start_execution_params["QueryExecutionContext"]["Database"] = database
+
+    if CATALOG != "":
+        if not "QueryExecutionContext" in start_execution_params:
+            start_execution_params["QueryExecutionContext"] = {}
+
+        start_execution_params["QueryExecutionContext"]["Catalog"] = CATALOG
+    
+    if workgroup != "":
+        start_execution_params["WorkGroup"] = workgroup
+    
+    
+    response = athena_client.start_query_execution(**start_execution_params)
     query_execution_id = response['QueryExecutionId']
     
     timeout = datetime.now() + timedelta(seconds = timeout_seconds)
@@ -95,4 +115,3 @@ def run_query_direct(query_string, database, params = []):
 
     df = pd.DataFrame.from_dict(results)
     return df
-
