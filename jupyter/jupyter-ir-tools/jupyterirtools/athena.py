@@ -9,7 +9,6 @@ import pandas as pd
 
 QUERY_TIMEOUT = int( os.environ.get('QUERY_TIMEOUT', '120'))
 CATALOG = os.environ.get('CATALOG', "AwsDataCatalog")
-
 named_queries = None
 
 def run_named_query(source, queryname, params=[]):
