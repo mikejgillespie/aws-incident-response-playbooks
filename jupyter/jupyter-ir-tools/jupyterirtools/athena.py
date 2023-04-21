@@ -19,12 +19,12 @@ QUERY_TIMEOUT = int( os.environ.get('QUERY_TIMEOUT', '120'))
 CATALOG = os.environ.get('CATALOG', "AwsDataCatalog")
 named_queries = None 
 
-def run_named_query_with_sql(source, queryname, params=[]):
+def run_named_query_with_sql(source, queryname, params={}):
     global named_queries
     session = boto3.session.Session()
     
     athena_client = session.client('athena')
-    
+        
     if named_queries is None:
         paginator = athena_client.get_paginator('list_named_queries')
 
@@ -41,20 +41,29 @@ def run_named_query_with_sql(source, queryname, params=[]):
         
     named_query = named_queries[f"{queryname}_{source}"]
     
-    return [run_query(named_query['QueryString'], named_query['Database'], named_query['WorkGroup'], params = params), named_query['QueryString']]
+    return run_query(named_query['QueryString'], named_query['Database'], named_query['WorkGroup'], params)
 
-def run_named_query(source, queryname, params=[]):
+def run_named_query(source, queryname, params={}):
     df, sql = run_named_query_with_sql(source,queryname, params)
     return df
 
-def run_query(query_string, database="", workgroup="", params = []):
+def run_query(query_string, database="", workgroup="", params={}):
     session = boto3.session.Session()
     athena_client = session.client('athena')
+    
+    if not "region" in params:
+        params["region"] = session.region_name
+        
+    if not "accountid" in params:
+        sts_client = session.client('sts')
+        params["accountid"] = sts_client.get_caller_identity()["Account"]
+        
+    sql = query_string.format(**params)
     
     timeout_seconds = QUERY_TIMEOUT
 
     start_execution_params = {
-        "QueryString": query_string,
+        "QueryString": sql,
         "ResultConfiguration":{
             'OutputLocation': S3_STAGING_DIR,
             'AclConfiguration': {
@@ -63,9 +72,6 @@ def run_query(query_string, database="", workgroup="", params = []):
         }
     }
     
-    if len(params) > 0:
-        start_execution_params["ExecutionParameters"]=params
-        
     if database != "":
         if not "QueryExecutionContext" in start_execution_params:
             start_execution_params["QueryExecutionContext"] = {}
@@ -118,4 +124,4 @@ def run_query(query_string, database="", workgroup="", params = []):
 
 
     df = pd.DataFrame.from_dict(results)
-    return df
+    return [df, sql]

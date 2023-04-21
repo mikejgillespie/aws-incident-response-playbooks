@@ -52,11 +52,11 @@ def get_client_by_account_region(role, service, accounts=[], regions=['us-east-1
         for region in regions:    
             session = get_session(role,account)
             
-            result.append({
-                "client": session.client(service, region_name=region),
-                "account": account,
-                "region": region
-            })
+            result.append([
+                session.client(service, region_name=region),
+                account,
+                region
+            ])
     
     return result
     

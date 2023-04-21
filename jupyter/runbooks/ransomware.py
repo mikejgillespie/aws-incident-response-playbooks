@@ -12,12 +12,12 @@ def cloudtrail_s3_events(org_root_account, active_regions, role):
     
     org_accounts = get_org_accounts()
     
-    for client in sso.get_client_by_account_region(role, 'cloudtrail', org_accounts, active_regions):
+    for client, account, region in sso.get_client_by_account_region(role, 'cloudtrail', org_accounts, active_regions):
 
-        response = client['client'].describe_trails()
+        response = client.describe_trails()
         trail = response['trailList'][0]
 
-        selectors = client['client'].get_event_selectors(TrailName=trail['TrailARN'])
+        selectors = client.get_event_selectors(TrailName=trail['TrailARN'])
 
         s3_data_events = False
         if 'AdvancedEventSelectors' in selectors:
@@ -25,11 +25,11 @@ def cloudtrail_s3_events(org_root_account, active_regions, role):
                 for field_selectors in selector['FieldSelectors']:
                     if field_selectors['Field'] == 'resources.type' and field_selectors['Equals'][0] == 'AWS::S3::Object':
                         s3_data_events = True
-                        result  += f"|<span style=\"color:green\"> &#9679;</span>|ENABLED|S3 Data Events.|{client['account']}|{client['region']}|\n"
+                        result  += f"|<span style=\"color:green\"> &#9679;</span>|ENABLED|S3 Data Events.|{account}|{region}|\n"
         results.append({
             "S3 Data Events": "ENABLED" if s3_data_events else "NOT ENABLED",
-            "Account": client['account'],
-            "Region": client['region']
+            "Account": account,
+            "Region": region
         })
 
     display_results_status("Evaluating Cloudtrail S3 Data Events", results,  lambda x: 1 if x['S3 Data Events'] == "ENABLED" else 3)
@@ -65,8 +65,8 @@ def check_org_trail(org_root_account, role, active_regions):
     })
     if not exist_org_trail:
         all_accounts_centralized = True
-        for client in sso.get_client_by_account_region(role, 'cloudtrail', org_accounts, active_regions):
-            list_trails_response = client['client'].describe_trails()
+        for client, account, region in sso.get_client_by_account_region(role, 'cloudtrail', org_accounts, active_regions):
+            list_trails_response = client.describe_trails()
             central_bucket = False
             for local_trail in list_trails_response['trailList']:
                 if local_trail['S3BucketName'] == central_bucket_name:
@@ -75,8 +75,8 @@ def check_org_trail(org_root_account, role, active_regions):
             results.append({
                 "Trail": "ENABLED" if central_bucket else "NOT ENABLED",
                 "Name": "Account/Region Trail",
-                "Account": client['account'],
-                "Region": client['region']
+                "Account": account,
+                "Region": region
             })
             
     display_results_status("Evaluating Organization Cloudtrail", results,  lambda x: 1 if x['Trail'] == "ENABLED" else 3)
@@ -86,12 +86,12 @@ def check_guardduty(active_regions, role):
 
     org_accounts = get_org_accounts()
     
-    for client in sso.get_client_by_account_region(role, 'guardduty', org_accounts, active_regions):
-        response = client['client'].list_detectors()
+    for client, account, region in sso.get_client_by_account_region(role, 'guardduty', org_accounts, active_regions):
+        response = client.list_detectors()
         results.append({
             "GuardDuty": "ENABLED" if len(response['DetectorIds']) > 0 else "NOT FOUND",
-            "Account": client['account'],
-            "Region": client['region']
+            "Account": account,
+            "Region": region
         })
             
     display_results_status("Evaluating AWS GuardDuty", results,  lambda x: 1 if x['GuardDuty'] == "ENABLED" else 3)
@@ -101,12 +101,12 @@ def check_aws_config(active_regions, role):
     
     org_accounts = get_org_accounts()
 
-    for client in sso.get_client_by_account_region(role, 'config', org_accounts, active_regions):
-        response = client['client'].describe_configuration_recorder_status()
+    for client, account, region in sso.get_client_by_account_region(role, 'config', org_accounts, active_regions):
+        response = client.describe_configuration_recorder_status()
         results.append({
             "Config Recorder": "ENABLED" if len(response['ConfigurationRecordersStatus']) > 0 else "DISABLED",
-            "Account": client['account'],
-            "Region": client['region']
+            "Account": account,
+            "Region": region
         })
 
     display_results_status("Evaluating AWS Config Recorders", results,  lambda x: 1 if x['Config Recorder'] == "ENABLED" else 3)
@@ -205,9 +205,9 @@ def check_patch_manager(active_regions, role):
     results = [] 
 
     org_accounts = get_org_accounts()
-    for client in sso.get_client_by_account_region(role, 'ssm', org_accounts, active_regions):
-        session = sso.get_session(role, client['account'], client['region'])
-        ec2_client = session.client('ec2', region_name = client['region'])
+    for client, account, region in sso.get_client_by_account_region(role, 'ssm', org_accounts, active_regions):
+        session = sso.get_session(role, account,region)
+        ec2_client = session.client('ec2', region_name = region)
         
         paginator = ec2_client.get_paginator('describe_instances').paginate()
         for page in paginator:
@@ -216,15 +216,15 @@ def check_patch_manager(active_regions, role):
                 for instance in reservation['Instances']:
                     instanceIds.append(instance['InstanceId'])
         
-            response = client['client'].describe_instance_patch_states(InstanceIds=instanceIds)
+            response = client.describe_instance_patch_states(InstanceIds=instanceIds)
             #print(response)
             for state in response['InstancePatchStates']:
                 results.append({
                     "Instance ID": state['InstanceId'],
                     "Patch Group": state['PatchGroup'],
                     "CriticalNonCompliantCount": state['CriticalNonCompliantCount'],
-                    "Account": client['account'],
-                    "Region": client['region']
+                    "Account": account,
+                    "Region": region
                 })
         
     display_results_status("Evaluating SSM Patch Manager activation", results,  lambda x: 1 if x['CriticalNonCompliantCount'] == 0 else 3)
@@ -294,14 +294,14 @@ def check_restricted_ssh_config_rule(configuration_aggregator, role, active_regi
                 org_restricted_ssh_rule = rule['ConfigRuleName']
                 
                 
-        for client in sso.get_client_by_account_region(role, 'ssm', org_accounts, active_regions):
+        for client, account, region in sso.get_client_by_account_region(role, 'ssm', org_accounts, active_regions):
         
             response = config_client.get_aggregate_compliance_details_by_config_rule(
                 ConfigurationAggregatorName=configuration_aggregator,
                 ConfigRuleName=org_restricted_ssh_rule,
                 ComplianceType='NON_COMPLIANT',
-                AccountId=client['account'],
-                AwsRegion=client['region']
+                AccountId=account,
+                AwsRegion=region
             )
 
             for result in response['AggregateEvaluationResults']:
