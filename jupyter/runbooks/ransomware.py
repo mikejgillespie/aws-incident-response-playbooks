@@ -200,7 +200,37 @@ def inspector_check_organization(active_regions, role):
 
     display_results_status("Inspector Instance Status", results,  lambda x: 1 if x['Scan Status'] == "ACTIVE" else 3)
 
+
+def check_dnslogging(active_regions, role):
+    results = []
+
+    org_accounts = get_org_accounts()
+    
+    for client, account, region in sso.get_client_by_account_region(role, 'ec2', org_accounts, active_regions):
+        session = sso.get_session(role, account,region)
+
+        route53_client = session.client('route53resolver')
         
+        paginator = route53_client.get_paginator('list_resolver_query_log_config_associations')
+
+        vpcs = {}
+
+        for page in paginator.paginate():
+            for associations in page['ResolverQueryLogConfigAssociations']:
+                if associations['ResourceId'].startswith('vpc'):
+                    vpcs[associations['ResourceId']] = True
+                    
+        paginator = client.get_paginator('describe_vpcs')
+
+
+
+        for page in paginator.paginate():
+            for vpc in page['Vpcs']:
+                vpc_id = vpc['VpcId']
+                results.append({"accountid": account, "region": region, "vpc_id": vpc_id, "dns_query_enabled": vpc_id in vpcs})
+
+    display_results_status("Outbound DNS Logging", results,  lambda x: 1 if x['dns_query_enabled'] == True else 3)
+                
 def check_patch_manager(active_regions, role):
     results = [] 
 
