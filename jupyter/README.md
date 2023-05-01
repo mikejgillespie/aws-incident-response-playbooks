@@ -12,7 +12,7 @@ The notebooks included in this repository combine automation in the form of pyth
 # Option 1: Quick Start
 The quick start will provide access to a SageMaker Jupyter notebook that downloads the notebook files in this repository. Once the notebook is available, it will be accessible through the SageMaker console. **Note**: The quick start only provides read-only access and Athena query access to AWS. If a notebook has remediatiation step, the notebook will not have permissions unless explicitly granted.
 
-1. Download this CloudFormation [Template](cfn-templates/sso-jupyter-server.yaml)
+1. Download this CloudFormation [Template](cfn-templates/jupyter-instance.yaml)
 1. All parameters are optional, accept the default parameters.
 1. Accept the IAM resources will be created.
 1. Find the Notebook server in the SageMaker [console](https://console.aws.amazon.com/sagemaker/home?#/notebook-instances)

@@ -11,7 +11,7 @@ To set IAM Identity Center permissions, provide values for the **SsoRegion** and
 * **DefaultRole**: The ARN of the role this notebook server should default to in the format: arn:aws:iam::AWS_ACCOUNTID:role/PERMISSION_SET_NAME
 
 ```
-aws cloudformation deploy --capabilities CAPABILITY_IAM --template-file sso-jupyter-server.yaml --parameter-overrides SsoRegion=<SSO_REGION> SsoUrl=<SSO_URL> DefaultRole=arn:aws:iam::AWS_ACCOUNTID:role/PERMISSION_SET_NAME --stack-name sso-jupyter-notebook
+aws cloudformation deploy --capabilities CAPABILITY_IAM --template-file jupyter-instance.yaml --parameter-overrides SsoRegion=<SSO_REGION> SsoUrl=<SSO_URL> DefaultRole=arn:aws:iam::AWS_ACCOUNTID:role/PERMISSION_SET_NAME --stack-name sso-jupyter-notebook
 ```
 ## IAM Role Assumption
 Alternatively, provide the roles that this instance will have access to assume
@@ -19,5 +19,5 @@ Alternatively, provide the roles that this instance will have access to assume
 * **DefaultRole**: The ARN of the role this notebook server should default to
 
 ```
-aws cloudformation deploy --capabilities CAPABILITY_IAM --template-file sso-jupyter-server.yaml --parameter-overrides LinkedRoles=arn1,arn2,arn3 DefaultRole=arn:aws:iam::AWS_ACCOUNTID:role/RoleName --stack-name sso-jupyter-notebook
+aws cloudformation deploy --capabilities CAPABILITY_IAM --template-file jupyter-instance.yaml --parameter-overrides LinkedRoles=arn1,arn2,arn3 DefaultRole=arn:aws:iam::AWS_ACCOUNTID:role/RoleName --stack-name sso-jupyter-notebook
 ```
