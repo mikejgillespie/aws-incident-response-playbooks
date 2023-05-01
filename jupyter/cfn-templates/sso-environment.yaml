@@ -1,84 +1,7 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: >-
   Configures the SSO for the Jupyter runbooks
-Parameters:
-  SsoInstanceArn:
-    Description: The arn of the SSO instance
-    Type: String
-  SsoDirectory:
-    Description: The name of the sso instance
-    Type: String
-  SsoPortalUrl:
-    Description: The portal url of the sso instance
-    Type: String
-  CfnDelegateAccount:
-    Type: String
-  LoggingAccount:
-    Type: String
 Resources:
-  SsoInstanceArnParameter:
-    Type: AWS::SSM::Parameter
-    Properties: 
-      Description: This contains the SSO Directory ID for this account
-      Type: String
-      Name: Jupyter-SSO-Instance-Arn
-      Value: !Ref SsoInstanceArn  
-  SsoDirectoryParameter:
-    Type: AWS::SSM::Parameter
-    Properties: 
-      Description: This contains the SSO Directory ID for this account
-      Type: String
-      Name: Jupyter-SSO-Directory
-      Value: !Ref SsoDirectory
-  SsoPortalUrlParameter:
-    Type: AWS::SSM::Parameter
-    Properties: 
-      Description: This contains the SSO Directory Url for this account
-      Type: String
-      Name: Jupyter-SSO-Portal-Url
-      Value: !Ref SsoPortalUrl
-  JupiterNotebookS3Parameter:
-    Type: AWS::SSM::Parameter
-    Properties: 
-      Description: This contains the SSO Directory Url for this account
-      Type: String
-      Name: Jupyter-S3
-      Value: !Ref notebookS3Bucket
-  LoggingAccountParameter:
-    Type: AWS::SSM::Parameter
-    Properties: 
-      Description: This contains the SSO Directory Url for this account
-      Type: String
-      Name: Jupyter-LoggingAccount
-      Value: !Ref LoggingAccount
-  CfnDelegateAccountParameter:
-    Type: AWS::SSM::Parameter
-    Properties: 
-      Description: This contains the SSO Directory Url for this account
-      Type: String
-      Name: Jupyter-CfnDelegateAccount
-      Value: !Ref CfnDelegateAccount
-  ManagementRegion:
-    Type: AWS::SSM::Parameter
-    Properties: 
-      Description: This contains the management region
-      Type: String
-      Name: Jupyter-Management-Region
-      Value: !Ref AWS::Region
-  ManagementAccount:
-    Type: AWS::SSM::Parameter
-    Properties: 
-      Description: This contains the management account
-      Type: String
-      Name: Jupyter-Management-Account
-      Value: !Ref AWS::AccountId
-  notebookS3Bucket:
-     Type: AWS::S3::Bucket
-     Properties:
-       BucketEncryption: 
-        ServerSideEncryptionConfiguration: 
-        - ServerSideEncryptionByDefault:
-            SSEAlgorithm: AES256
   ViewOnlyPermissionSet:
     Type: AWS::SSO::PermissionSet
     Properties: 
@@ -157,21 +80,4 @@ Resources:
         - arn:aws:iam::aws:policy/AdministratorAccess
       Name: Jupyter-IR-AdministratorAccess
       SessionDuration: PT2H
-      InlinePolicy: '{
-        "Version": "2012-10-17",
-        "Statement": [
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "sts:AssumeRole"
-                ],
-                "Resource":[
-                  "arn:aws:iam::*:role/Jupyter-IR-AdministratorAccess"
-                  ]
-            }
-          ]
-      }'
 
-Outputs:
-  NotebookS3Bucket:
-    Value: !Ref notebookS3Bucket

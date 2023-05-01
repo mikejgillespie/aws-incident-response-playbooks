@@ -1,91 +1,33 @@
 Description: "Create basic notebook instance"
 Description: >-
-  Creates a SageMaker Jupyter runbook configured to run against SSO.
+  Creates a SageMaker Jupyter runbook configured to run incident response notebools. All the parameters are optional, 
+  and to get started, deploy this notebook leaving all the parameters blank.
 Parameters:
   SsoUrl:
     Type: String
+    Default: ''
     Description: The URL for the IAM Identity Center (SSO)
   SsoRegion:
     Type: String
+    Default: ''
     Description: The Region for the IAM Identity Center (SSO)
-  LoggingAccount:
+  LinkedRoles:
     Type: String
-    Description: The 12-digit AWS account ID for the logging account.
-  ManagementAccount:
+    Default: ''
+    Description: A comma separated list of roles urns in that this notebook will have access via role assumption.
+  DefaultRole:
     Type: String
-    Description: The 12-digit AWS account ID for the AWS Organizations management account.
-  JumpAccount:
-    Type: String
-    Default: 000000000000
-    Description: "Optional - The 12-digit AWS account ID to assume roles outside of the AWS Organizations management account."
+    Default: ''
+    Description: (Optional) The default role ARN that this account will have access.
+Conditions:
+  AssumeRolePermission: !Not [!Equals [!Ref LinkedRoles, '']]
 Resources:
-  BasicNotebookInstanceLifecycleConfig:
-    Type: "AWS::SageMaker::NotebookInstanceLifecycleConfig"
-    Properties:
-      OnCreate:
-      - Content:
-          Fn::Base64: !Sub |
-            #!/bin/bash
-
-            set -e
-
-            sudo -u ec2-user -i <<'EOF'
-            cd /home/ec2-user/SageMaker
-            git clone https://github.com/mikejgillespie/aws-incident-response-playbooks
-            EOF
-      OnStart:
-      - Content:
-          Fn::Base64: !Sub |
-            #!/bin/bash
-
-            set -e
-
-            # OVERVIEW
-            # This script gets value from Notebook Instance's tag and sets it as environment
-            # variable for all process including Jupyter in SageMaker Notebook Instance
-            #
-            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-            unzip -qq awscliv2.zip
-            sudo ./aws/install --update
-            rm -rf aws
-            rm awscliv2.zip
-
-            rm -f /home/ec2-user/anaconda3/envs/JupyterSystemEnv/bin/aws
-
-            # PARAMETERS
-            touch /etc/profile.d/jupyter-env.sh
-            echo "export MANAGEMENT_ACCOUNT=${ManagementAccount}" >> /etc/profile.d/jupyter-env.sh
-            echo "export LOGGING_ACCOUNT=${LoggingAccount}" >> /etc/profile.d/jupyter-env.sh
-            echo "export SSO_URL=${SsoUrl}" >> /etc/profile.d/jupyter-env.sh
-            echo "export SSO_REGION=${SsoRegion}" >> /etc/profile.d/jupyter-env.sh
-            echo "export JUMP_ACCOUNT=${JumpAccount}" >> /etc/profile.d/jupyter-env.sh
-            #initctl restart jupyter-server --no-wait
-
-            sudo -u ec2-user -i <<'EOF'
-
-            PACKAGE=pyathena
-            ENVIRONMENT=python3
-            source /home/ec2-user/anaconda3/bin/activate "$ENVIRONMENT"
-            rm  /home/ec2-user/anaconda3/envs/python3/bin/aws
-            pip install --upgrade "$PACKAGE"
-            pip install -e /home/ec2-user/SageMaker/aws-incident-response-playbooks/jupyter/jupyter-ir-tools
-            source /home/ec2-user/anaconda3/bin/deactivate
-
-
-            EOF
-
-            echo "Restarting the Jupyter server.."
-            restart jupyter-server
-  BasicNotebookInstance:
-    Type: "AWS::SageMaker::NotebookInstance"
-    Properties:
-      InstanceType: "ml.t2.large"
-      RoleArn: !GetAtt ExecutionRole.Arn
-      LifecycleConfigName: !GetAtt BasicNotebookInstanceLifecycleConfig.NotebookInstanceLifecycleConfigName
-      
   ExecutionRole: 
     Type: "AWS::IAM::Role"
     Properties: 
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/job-function/ViewOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonAthenaFullAccess
       AssumeRolePolicyDocument: 
         Version: "2012-10-17"
         Statement: 
@@ -97,7 +39,20 @@ Resources:
           Action: 
           - "sts:AssumeRole"
       Path: "/"
-      Policies: 
+      Policies:
+        - !If 
+          - AssumeRolePermission
+          - PolicyName: assume-roles
+            PolicyDocument: 
+              Version: "2012-10-17"
+              Statement: 
+                - Effect: "Allow"
+                  Action: 
+                    - "sts:AssumeRole"
+                  Resource: !Split 
+                              - ','
+                              - !Ref LinkedRoles
+          - !Ref AWS::NoValue
         - PolicyName: write-logs
           PolicyDocument: 
             Version: "2012-10-17"
@@ -111,29 +66,4 @@ Resources:
                   - "logs:GetLogEvents"
                 Resource: 
                 - '*'
-        - PolicyName: "List-SSO-PermissionSets-Accounts"
-          PolicyDocument: 
-            Version: "2012-10-17"
-            Statement: 
-              - Effect: "Allow"
-                Action: 
-                  - "sso:ListPermissionSets"
-                  - "sso:ListAccountsForProvisionedPermissionSet"
-                  - "sso:DescribePermissionSet"
-                Resource: 
-                - '*'
-        - 
-          PolicyName: "parameter-store-policy"
-          PolicyDocument: 
-            Version: "2012-10-17"
-            Statement: 
-              - Effect: "Allow"
-                Action: 
-                  - "ssm:GetParameter"
-                Resource: 
-                - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/Jupyter-*
 
-Outputs:
-  BasicNotebookInstanceId:
-    Value: !Ref BasicNotebookInstance
-    Value: !GetAtt BasicNotebookInstance.NotebookInstanceName
