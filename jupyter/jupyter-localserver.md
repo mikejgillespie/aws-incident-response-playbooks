@@ -18,11 +18,8 @@ Starting with macOS Catalina (10.15), Apple set the default shell to the Z shell
 
 Add these lines to your ~/.zshrc file for zsh and ~/.bash_profile for bash. Note: The jump account is used to assume roles in non-AWS Organizations accounts, see section 'Optional - Include accounts outside the AWS Organization'.
 ```
-export LOGGING_ACCOUNT=<LOGGING_ACCOUNT_ID>
 export SSO_URL=<SSO LOGIN URL>
 export SSO_REGION=<SSO REGION>
-export MANAGEMENT_ACCOUNT=<MANAGEMENT_ACCOUNT_ID>
-export JUMP_ACCOUNT=<JUMP_ACCOUNT_ID>
 ```
 
 Restart your terminal window so these changes take effect.
@@ -53,11 +50,8 @@ msiexec.exe /i https://awscli.amazonaws.com/AWSCLIV2.msi
 
 Set the environment variables for the SSO environment. Note: The jump account is used to assume roles in non-AWS Organizations accounts, see section 'Optional - Include accounts outside the AWS Organization'.
 ```
-setx LOGGING_ACCOUNT <LOGGING_ACCOUNT_ID>
 setx SSO_URL <SSO LOGIN URL>
 setx SSO_REGION <SSO REGION>
-setx MANAGEMENT_ACCOUNT <MANAGEMENT_ACCOUNT_ID>
-setx JUMP_ACCOUNT <JUMP_ACCOUNT_ID>
 ```
 
 then install jupyterlab and 

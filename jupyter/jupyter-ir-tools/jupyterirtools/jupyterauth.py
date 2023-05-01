@@ -39,7 +39,7 @@ elif len(linked_roles) > 0:
     auth_type = "ASSUME_ROLE"
 
 #auth_type = "ASSUME_ROLE"
-auth_type = "DEFAULT"
+#auth_type = "DEFAULT"
 #default_account = "383086473915"
 #default_role = "Jupyter-IR-ViewOnly"
 

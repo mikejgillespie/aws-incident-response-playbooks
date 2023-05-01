@@ -2,7 +2,7 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: >-
   Configures the a non-SSO account to have roles that align with the Jupyter-IR Runbooks
 Parameters:
-  JumpAccount:
+  JupyterAccount:
     Type: String
 Resources:
   SysAdminRole:
@@ -14,7 +14,7 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              AWS: !Ref JumpAccount
+              AWS: !Ref JupyterAccount
             Action:
               - 'sts:AssumeRole'
       ManagedPolicyArns: 
@@ -29,7 +29,7 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              AWS: !Sub JumpAccount
+              AWS: !Sub JupyterAccount
             Action:
               - 'sts:AssumeRole'
       ManagedPolicyArns: 
@@ -44,7 +44,7 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              AWS: !Ref JumpAccount
+              AWS: !Ref JupyterAccount
             Action:
               - 'sts:AssumeRole'
       ManagedPolicyArns: 
