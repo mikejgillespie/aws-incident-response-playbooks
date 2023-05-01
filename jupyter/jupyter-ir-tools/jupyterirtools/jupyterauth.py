@@ -42,9 +42,9 @@ elif len(linked_accounts) > 0:
     auth_type = "ASSUME_ROLE"
 
 #auth_type = "ASSUME_ROLE"
-auth_type = "DEFAULT"
-default_account = "383086473915"
-default_role = "Jupyter-IR-ViewOnly"
+#auth_type = "DEFAULT"
+#default_account = "383086473915"
+#default_role = "Jupyter-IR-ViewOnly"
 
 def login(permission_set = '', account_id='', force_login = False):
     global linked_accounts
