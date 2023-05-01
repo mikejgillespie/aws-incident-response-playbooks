@@ -27,27 +27,30 @@ AWS_SSO_CACHE_PATH = f"{Path.home()}/.aws/sso/cache"
 sso_start_url = os.environ.get('SSO_URL', '')
 aws_region = os.environ.get('SSO_REGION', '')
 
-linked_accounts_str = os.environ.get('LINKED_ACCOUNTS', '')
-linked_accounts = linked_accounts_str.split(',') if linked_accounts_str != "" else []
+
 linked_roles_str = os.environ.get('LINKED_ROLES', '')
 linked_roles = linked_roles_str.split(',') if linked_roles_str != "" else []
-
-default_account = os.environ.get('DEFAULT_ACCOUNT', '' if len(linked_accounts)==0 else linked_accounts[0])
-default_role = os.environ.get('DEFAULT_ROLE', '' if len(linked_roles)==0 else linked_roles[0])
+default_role = os.environ.get('DEFAULT_ROLE', ''  if len(linked_roles)==0 else linked_roles[0])
 
 auth_type = "DEFAULT"
 if sso_start_url != "":
     auth_type = "SSO"
-elif len(linked_accounts) > 0:
+elif len(linked_roles) > 0:
     auth_type = "ASSUME_ROLE"
 
 #auth_type = "ASSUME_ROLE"
-#auth_type = "DEFAULT"
+auth_type = "DEFAULT"
 #default_account = "383086473915"
 #default_role = "Jupyter-IR-ViewOnly"
 
-def login(permission_set = '', account_id='', force_login = False):
-    global linked_accounts
+def parse_role_arn(arn):
+    arn_info = arn.split(':')
+    role_name = arn_info[5][5:]
+    return [arn_info[4], role_name ]
+
+def login(force_login = False):
+    global default_role
+    
     """
     login does creates an SSO session for the current user. If a session already exists, it will
     be reused. If supplied, the given permission set and account ID will be used to set the
@@ -61,21 +64,29 @@ def login(permission_set = '', account_id='', force_login = False):
     if auth_type == "SSO":
         print('Logging in with IAM Identity Center....')
         
-        account_id = default_account if account_id == '' else account_id
-        permission_set = default_role if permission_set == '' else permission_set
-        os.environ["AWS_PROFILE"] = f"{permission_set}-{account_id}"
+        sso_login(force_login)  
+        
+        if default_role == '' and len(linked_roles) > 0:
+            default_role = linked_roles[0]
+            
+        account_id, permission_set = parse_role_arn(default_role)
         init_profiles(permission_set, account_id)
+        os.environ["AWS_PROFILE"] = f"{permission_set}-{account_id}"
+        
 
-        sso_login(account_id, permission_set, force_login)  
     elif auth_type == "ASSUME_ROLE":
-        print('Use role assumption')
-        account_id = default_account if account_id == '' else account_id
-        permission_set = default_role if permission_set == '' else permission_set
+        
+        if default_role == '' and len(linked_roles) > 0:
+            default_role = linked_roles[0]
+        
+        account_id, role_name = parse_role_arn(default_role)
+        
+        print(f'Use role assumption: Default {default_role}')
         
         my_session = boto3.session.Session()
         my_region = my_session.region_name
-        init_profiles_assume_role(permission_set, account_id, my_region)
-        os.environ["AWS_PROFILE"] = f"{permission_set}-{account_id}"
+        init_profiles_assume_role(role_name, account_id, my_region)
+        os.environ["AWS_PROFILE"] = f"{role_name}-{account_id}"
         
     else:
         print('Using default profile')
@@ -122,10 +133,12 @@ def get_session_by_account(role=''):
         session = get_session(principal_name,account_id)
         result.append([session, account_id])
     else:
-        role = role if role != "" else default_role
-        for account in linked_accounts:
-            session = get_session(role,account)
-            result.append([session, account])
+        for role_arn in linked_roles:
+            account, assumed_role = parse_role_arn(role_arn)
+            
+            if role == "" or assumed_role == role:
+                session = get_session(assumed_role,account)
+                result.append([session, account])
     return result
 
 # get_sess
@@ -144,8 +157,8 @@ def get_session(permission_set='', account_id='', region_name='us-east-1'):
     if auth_type=="DEFAULT":
         return boto3.session.Session();
     
-    account_id = account_id if account_id != "" else default_account
-    permission_set = permission_set if permission_set != '' else default_role
+    if permission_set == '' and account_id == '':
+        account_id, permission_set = parse_role_arn(default_role)
         
     profile = f"{permission_set}-{account_id}"
     
@@ -426,16 +439,17 @@ def logout():
 def check_permissions():
     results = []
     if auth_type == "SSO" or auth_type == "ASSUME_ROLE":
-        for account in linked_accounts:
-            for role in linked_roles:
-                try:
-                    session = get_session(role, account)
-                    sts = session.client('sts')
-                    identity = sts.get_caller_identity()
-                    results.append({"Account": account, "Role": role, "Status": "Successful"})
+        for role_arn in linked_roles:
+            try:
+                account, role = parse_role_arn(role_arn)
+                session = get_session(role, account)
+                sts = session.client('sts')
+                identity = sts.get_caller_identity()
+                
+                results.append({"Account": account, "Role": role, "Status": "Successful"})
 
-                except botocore.exceptions.ClientError as error:
-                    results.append({"Account": account, "Role": role, "Status": "Access Denied"})
+            except botocore.exceptions.ClientError as error:
+                results.append({"Account": account, "Role": role, "Status": "Access Denied"})
                     
     else:
         sts = boto3.client('sts')
@@ -456,7 +470,7 @@ def get_permissions_sso():
     """
     print_permissions uses the boto3 sso library to list all the account & permission set access the current user has access to.
     """ 
-    global linked_accounts
+    global linked_roles
 
     access_token = ""
     
@@ -483,25 +497,23 @@ def get_permissions_sso():
     paginator = sso.get_paginator('list_accounts')
     results = paginator.paginate(accessToken=access_token)
     account_list = results.build_full_result()['accountList']
-    linked_accounts = []
+    linked_roles = []
     for account in account_list:
         sso_account_id = account['accountId']
-        linked_accounts.append(sso_account_id)
-        #sso_account_name = account['accountName'].replace("_", "-")
-        #paginator = sso.get_paginator('list_account_roles')
-        #results = paginator.paginate(
-        #    accountId=sso_account_id,
-        #    accessToken=access_token
-        #)
-        #role_list = results.build_full_result()['roleList']
-        #role_list.sort(key=role_name)
+        sso_account_name = account['accountName'].replace("_", "-")
+        paginator = sso.get_paginator('list_account_roles')
+        results = paginator.paginate(
+            accountId=sso_account_id,
+            accessToken=access_token
+        )
+        role_list = results.build_full_result()['roleList']
+        role_list.sort(key=role_name)
         
-        #for role in role_list:
-        #    if role['roleName'] in linked_roles:
-        #        print(f"Account: {role['accountId']}: Role: {role['roleName']}")
+        for role in role_list:
+            linked_roles.append(f"arn:aws:iam::{sso_account_id}:role/{role['roleName']}")
         
 
-def sso_login(account_id, role_name, force_login = False):
+def sso_login(force_login = False):
     """
     get_sso_cached_login attempts to load the active SSO session based on the AWS_SSO_CACHE_PATH.
     If the cached sso data is valid, it will return that SSO session, otherise it will raise an ExpiredSSOCredentialsError error.
@@ -516,7 +528,7 @@ def sso_login(account_id, role_name, force_login = False):
     access_token = fetch_access_token()
     
     
-    write_console_link(account_id, role_name, access_token)
+    #write_console_link(account_id, role_name, access_token)
     get_permissions_sso()
 
 
