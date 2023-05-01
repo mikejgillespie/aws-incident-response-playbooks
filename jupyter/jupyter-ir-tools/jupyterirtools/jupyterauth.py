@@ -15,6 +15,7 @@ from botocore.config import Config
 from pathlib import Path
 import urllib, sys
 import requests # 'pip install requests'
+from . import utils
 
 
 # Set global variables for the default location of the AWS config files
@@ -28,9 +29,11 @@ aws_region = os.environ.get('SSO_REGION', '')
 
 linked_accounts_str = os.environ.get('LINKED_ACCOUNTS', '383086473915,913149361159')
 linked_accounts = linked_accounts_str.split(',') if linked_accounts_str != "" else []
-linked_roles_str = os.environ.get('LINKED_ROLES', 'Jupyter-IR-ViewOnly,Jupyter-IR-AdministratorAccess2')
+linked_roles_str = os.environ.get('LINKED_ROLES', 'Jupyter-IR-ViewOnly,Jupyter-IR-AdministratorAccess')
 linked_roles = linked_roles_str.split(',') if linked_roles_str != "" else []
 
+default_account = os.environ.get('DEFAULT_ACCOUNT', '' if len(linked_accounts)==0 else linked_accounts[0])
+default_role = os.environ.get('DEFAULT_ROLE', '' if len(linked_roles)==0 else linked_roles[0])
 
 auth_type = "DEFAULT"
 if sso_start_url != "":
@@ -38,8 +41,11 @@ if sso_start_url != "":
 elif len(linked_accounts) > 0:
     auth_type = "ASSUME_ROLE"
 
-auth_type = "SSO"
-    
+#auth_type = "ASSUME_ROLE"
+auth_type = "DEFAULT"
+default_account = "383086473915"
+default_role = "Jupyter-IR-ViewOnly"
+
 def login(permission_set = '', account_id='', force_login = False):
     global linked_accounts
     """
@@ -54,20 +60,18 @@ def login(permission_set = '', account_id='', force_login = False):
     
     if auth_type == "SSO":
         print('Logging in with IAM Identity Center....')
-        if account_id=="":
-            account_id = os.environ.get('LOGGING_ACCOUNT')
-
-        permission_set = linked_roles[0] if permission_set == '' else permission_set
+        
+        account_id = default_account if account_id == '' else account_id
+        permission_set = default_role if permission_set == '' else permission_set
         os.environ["AWS_PROFILE"] = f"{permission_set}-{account_id}"
         init_profiles(permission_set, account_id)
 
         sso_login(account_id, permission_set, force_login)  
     elif auth_type == "ASSUME_ROLE":
         print('Use role assumption')
-        if account_id == '':
-            account_id = linked_accounts[0]
+        account_id = default_account if account_id == '' else account_id
+        permission_set = default_role if permission_set == '' else permission_set
         
-        permission_set = linked_roles[0] if permission_set == '' else permission_set
         my_session = boto3.session.Session()
         my_region = my_session.region_name
         init_profiles_assume_role(permission_set, account_id, my_region)
@@ -118,14 +122,14 @@ def get_session_by_account(role=''):
         session = get_session(principal_name,account_id)
         result.append([session, account_id])
     else:
-        role = role if role != "" else linked_roles[0]
+        role = role if role != "" else default_role
         for account in linked_accounts:
             session = get_session(role,account)
             result.append([session, account])
     return result
 
 # get_sess
-def get_session(permission_set, account_id='', region_name='us-east-1'):
+def get_session(permission_set='', account_id='', region_name='us-east-1'):
     """
     get_session creates a boto3 session for the permission set, account id, and region. 
     Prior to creating the session, the profile will be configured in the ~/.aws/config file. 
@@ -140,8 +144,8 @@ def get_session(permission_set, account_id='', region_name='us-east-1'):
     if auth_type=="DEFAULT":
         return boto3.session.Session();
     
-    if account_id=="":
-        account_id = linked_accounts[0]
+    account_id = account_id if account_id != "" else default_account
+    permission_set = permission_set if permission_set != '' else default_role
         
     profile = f"{permission_set}-{account_id}"
     
@@ -420,6 +424,7 @@ def logout():
             pass
     
 def check_permissions():
+    results = []
     if auth_type == "SSO" or auth_type == "ASSUME_ROLE":
         for account in linked_accounts:
             for role in linked_roles:
@@ -427,23 +432,24 @@ def check_permissions():
                     session = get_session(role, account)
                     sts = session.client('sts')
                     identity = sts.get_caller_identity()
-                    print(f"Account: {account}: Role: {role} Successful")
+                    results.append({"Account": account, "Role": role, "Status": "Successful"})
+
                 except botocore.exceptions.ClientError as error:
-                    print(f"Account: {account}: Role: {role} Failed")
+                    results.append({"Account": account, "Role": role, "Status": "Access Denied"})
                     
     else:
-        return print_permissions_default()
+        sts = boto3.client('sts')
+        identity = sts.get_caller_identity()
+        arn_info = identity['Arn'].split(':')
+        account_id = arn_info[4]
+        principal_info = arn_info[5].split('/')
+        principal_type = principal_info[0]
+        principal_name = principal_info[1]
+        results.append({"Account": account_id, "Role": principal_name, "Status": "Successful"})
+
+    utils.display_results_status("Account Status", results, lambda x: 1 if x['Status'] == "Successful" else 3)
 
 
-def print_permissions_default():
-    sts = boto3.client('sts')
-    identity = sts.get_caller_identity()
-    arn_info = identity['Arn'].split(':')
-    account_id = arn_info[4]
-    principal_info = arn_info[5].split('/')
-    principal_type = principal_info[0]
-    principal_name = principal_info[1]
-    print(f"Account: {account_id}: Role: {principal_name} Successful")
 
 
 def get_permissions_sso():

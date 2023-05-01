@@ -4,26 +4,56 @@ Jupyter notebooks are typically thought of as a platform for data science and ma
 The notebooks included in this repository combine automation in the form of python code cells and documentation with Markdown. Code in a Jupyter notebook can be executed step-by-step, allowing the user to interact with AWS and non-AWS resources through API calls and data visualized with graphs and charts. The incident response runbooks included in the Jupyter section differ from others in the repository because they depend on configurations within the account to simplify the automation. For example, having all of the organization CloudTrail logs in a specific Athena table means the same notebook can be used across accounts.
 
 * **Opinionated**: The configuration of the AWS account and organization is opionated in order to allow the same scripts to be executed across many accounts. A CloudFormation template is included to configure the management account to have the proper account setup.
-* **SSO Authentication**: This solution uses IAM Identity Center for authentication of users. This eliminates the need to grant bread access to the notebook server and permissions within a notebook can be scoped down to what is needed for the response.
-* **Notebook Server** The notebooks in this repositiry can use either SageMaker Notebooks or local Jupyter notebooks. A CloudFormation template is included to create a SageMaker Notebook server with the proper permissions.
 
-# Prerequisites
-This project assumes the accounts are organized with:
-* **AWS Organizations**
-* **IAM Identity Center (Formerly SSO)**
+* **Multi-account**: The runbooks can be configured to run in a single or multi-account mode.
 
+* **Notebook Server** The notebooks in this repositiry can use either SageMaker Notebooks or local Jupyter notebooks. A CloudFormation template is included to create a SageMaker Notebook server with the proper permissions.  
 
+# Option 1: Quick Start
+The quick start will provide access to a SageMaker Jupyter notebook that downloads the notebook files in this repository. Once the notebook is available, it will be accessible through the SageMaker console.
 
-# Installation
+1. Download this CloudFormation [Template](cfn-templates/sso-jupyter-server.yaml)
+1. All parameters are optional, accept the default parameters.
+1. Accept the IAM resources will be created.
+1. Find the Notebook server in the SageMaker [console](https://console.aws.amazon.com/sagemaker/home?#/notebook-instances)
+
+# Option 2: Installation
 1. Clone the repo for a local copy
-1. Configure the **IAM Identity Center (Formerly SSO)**. See next section
-1. Create a Create a Jupyter Server instance either locally or using **SageMaker Notebooks**.
-1. Configure the **AWS Organizations** settings using the [Configure AWS Organzations](configure-aws-organizations.ipynb) notebook.
+1. Create a Create a Jupyter Server instance either:
+  1. [SageMaker Notebook](jupyter-sagemaker-notebook.md) - Simplest and easiest way to get started
+  1. [Local Jupyter Notebook](jupyter-localserver.md)
+1. Configure the authentication method
+  1. Single Account
+    1. Instance Profile / IAM User
+  1. Multi-Account
+    1. AWS Organizations + IAM Identity Center (Formerly SSO)
+    1. Instance Profile + Cross-Account Role Assumption
+    1. Configure the **AWS Organizations** settings using the [Configure AWS Organzations](configure-aws-organizations.ipynb) notebook.
 
-### Clone the Repo
+## Clone the Repo
 Clone this repo to get a copy of the source code locally.
 
-### IAM Identity Center (Formerly SSO) Configuration
+## Create a Jupyter Server
+There are two options you can choose from, either use a SageMaker notebook instance, or you can create a local notebook server.
+
+* [Local Jupyter Notebook](jupyter-localserver.md)
+* [SageMaker Notebook](jupyter-sagemaker-notebook.md)
+
+
+## Configure the authentication method
+The first consideration is if the runbooks will be run in a single account or cross account. The single account method is the simplest, as it doesn't require any cross account permissions. However, in some notebooks there may be a need to run across accounts in an organization, but only the existing account will be accessable. The notebooks will work, they just won't be able to collect data across accounts.
+
+### Single Account
+For a single account, simple grant access to the instance profile that runs the Jupyter to assume the 3 roles provided in [non-sso-account.yaml](cfn-templates/non-sso-account.yaml).
+
+```
+aws cloudformation deploy --stack-name jupyter-iam-roles --capabilities CAPABILITY_IAM --parameter-overrides NotebookServerIamArn=xx --template-file non-sso-account.yaml
+```
+
+#### Multiple Account
+It is a best practice to use AWS Organizations to manage the collection of accounts. If you are using AWS Organizations and IAM Identity Center, this is the best way to authenticate the Jupyter Notebook context.
+
+## IAM Identity Center (Formerly SSO) Configuration
 In order for the scripts to execute successfully, the account and organization must be configured to have resources available for the notebooks to gather data such as CloudTrail logs and VPC Flow Logs. Follow the steps to configure the account:
 
 1. Identify the account and region that is hosting your AWS Identity Center. 
@@ -63,105 +93,24 @@ Associate the AWS accounts with the permission sets and users/groups.
 * https://aws.amazon.com/premiumsupport/knowledge-center/create-sso-permission-set
 
 
-### Create a Jupyter Server
-There are two options you can choose from, either use a SageMaker notebook instance, or you can create a local notebook server.
+####  Instance Profile + Cross-Account Role Assumption
+Is IAM identity center is not an option, then you can deploy the the roles using an AWS cloudformation stackset. This can be done using AWS Organizations (preferred) or explicitylisting the accounts.
 
-#### SageMaker
-The SageMaker notebooks should be deployed to the same account and region as the IAM Identity Center.
+TO DO:
+* create stack that deploys a stack set to specific OUs, organizational-root-id, or accounts
+* grab the instance profile arn from parameter store
+* store the list of accounts in parameter store?
+* for SSO, there needs to be a base account - maybe just pull the first account from the list?
+* Change library from sso to awsauth.
+  * Not login... Set role with optional account?
 
-A cloudformation template is included in this repo to create a Jupyter notebook instance with the correct permissions.
 
-**Parameters**:
-* **SsoRegion**: The region the SSO instance is running
-* **SsoUrl**: The URL to connect to the SSO instance
-* **LoggingAccount**: The AWS Account ID for the logging account
-* **ManagementAccount**: The AWS Account ID for the management account
-
-```
-aws cloudformation deploy --capabilities CAPABILITY_IAM --template-file sso-jupyter-server.yaml --parameter-overrides SsoRegion=<SSO_REGION> SsoUrl=<SSO_URL> LoggingAccount=<LOGGING_ACCOUNT> ManagementAccount=<MANAGEMENT_ACCOUNT> --stack-name sso-jupyter-notebook
-```
-
-Skip ahead to **Verifying The Jupyter Lab Server**
-
-#### Local
-Jupyter can be installed locally and configured to run with the 
-
-##### MacOS
-**Start in the project directory**
-
-If the AWS CLI v2 is not installed:
-```
-curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
-sudo installer -pkg AWSCLIV2.pkg -target /
-```
-
-The Jupyter server can be installed using pip.
-```
-pip install jupyterlab boto3 pyathena
-```
-
-Add the environment variables to your ~/.bash_profile or ~/.zshrc file depending on which version of MacOS your are running.
-
-Starting with macOS Catalina (10.15), Apple set the default shell to the Z shell (zsh). In previous macOS versions, the default was Bash.
-
-Add these lines to your ~/.zshrc file for zsh and ~/.bash_profile for bash. Note: The jump account is used to assume roles in non-AWS Organizations accounts, see section 'Optional - Include accounts outside the AWS Organization'.
-```
-export LOGGING_ACCOUNT=<LOGGING_ACCOUNT_ID>
-export SSO_URL=<SSO LOGIN URL>
-export SSO_REGION=<SSO REGION>
-export MANAGEMENT_ACCOUNT=<MANAGEMENT_ACCOUNT_ID>
-export JUMP_ACCOUNT=<JUMP_ACCOUNT_ID>
-```
-
-Restart your terminal window so these changes take effect.
 
 ```
-cd jupyter
-pip install -e jupyter-ir-tools
-```
-
-Then run the Jupyter Lab server:
-```
-jupyter-lab
-```
-
-##### Windows
-
-**Start in the project directory**
-
-Install Pip if it isn't already installed:
-```
-curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-python get-pip.py
-```
-Install the CLI v2:
-```
-msiexec.exe /i https://awscli.amazonaws.com/AWSCLIV2.msi
-```
-
-Set the environment variables for the SSO environment. Note: The jump account is used to assume roles in non-AWS Organizations accounts, see section 'Optional - Include accounts outside the AWS Organization'.
-```
-setx LOGGING_ACCOUNT <LOGGING_ACCOUNT_ID>
-setx SSO_URL <SSO LOGIN URL>
-setx SSO_REGION <SSO REGION>
-setx MANAGEMENT_ACCOUNT <MANAGEMENT_ACCOUNT_ID>
-setx JUMP_ACCOUNT <JUMP_ACCOUNT_ID>
-```
-
-then install jupyterlab and 
-```
-pip install jupyterlab boto3 pyathena
-```
+aws cloudformation create-stack-set --stack-set-name jupyter-roles --capabilities CAPABILITY_IAM --parameter-overrides SsoDirectory=IDENTITY_SOURCE_ID SsoPortalUrl=PORTAL_URL SsoInstanceArn=IDENTITYINSTANCE_ARN CfnDelegateAccount=CFN_ACCOUNT_ID LoggingAccount=LOGGING_ACCOUNT_ID --template-url non-sso-account.yaml
 
 ```
-cd jupyter
-pip install -e jupyter-ir-tools
-```
 
-Run jupyter:
-```
-jupyter-lab
-```
 
 
 #### Verifying The Jupyter Lab Server
@@ -182,8 +131,6 @@ sso.login(role, aws_account)
 
 Lastly, check the configuration of the logs using  [check-organization-readiness](check-organization-readiness.ipynb) notebook.
 
-## Optional - Include accounts outside the AWS Organization
-If there are any accounts that are outside of the AWS organization that you could like to execute runbooks, create a CloudFormation stack with the [non-sso-account.yaml](cfn-templates/non-sso-account.yaml) template.
 
 This could be useful to have runbooks to help onboard an account into the Organization, or any time the account intentionally resides outside the organization. The runbook sso library will first attempt to assume the SSO role in the account, when that fails, it will then try to assume the role through the 'jump' account. There is no changes in the runbook needed, as the sso library manages all of the role assumption details. Note: Instead of the management account, another account should be designated as the account that non-SSO accounts inherit permissions.
 
