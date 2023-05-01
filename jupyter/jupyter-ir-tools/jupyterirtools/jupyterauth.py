@@ -27,9 +27,9 @@ AWS_SSO_CACHE_PATH = f"{Path.home()}/.aws/sso/cache"
 sso_start_url = os.environ.get('SSO_URL', '')
 aws_region = os.environ.get('SSO_REGION', '')
 
-linked_accounts_str = os.environ.get('LINKED_ACCOUNTS', '383086473915,913149361159')
+linked_accounts_str = os.environ.get('LINKED_ACCOUNTS', '')
 linked_accounts = linked_accounts_str.split(',') if linked_accounts_str != "" else []
-linked_roles_str = os.environ.get('LINKED_ROLES', 'Jupyter-IR-ViewOnly,Jupyter-IR-AdministratorAccess')
+linked_roles_str = os.environ.get('LINKED_ROLES', '')
 linked_roles = linked_roles_str.split(',') if linked_roles_str != "" else []
 
 default_account = os.environ.get('DEFAULT_ACCOUNT', '' if len(linked_accounts)==0 else linked_accounts[0])
