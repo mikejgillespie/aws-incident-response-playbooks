@@ -19,7 +19,7 @@ QUERY_TIMEOUT = int( os.environ.get('QUERY_TIMEOUT', '120'))
 CATALOG = os.environ.get('CATALOG', "AwsDataCatalog")
 named_queries = None 
 
-def run_named_query_with_sql(source, queryname, params={}):
+def run_named_query_with_sql_params(source, queryname, params={}):
     global named_queries
     session = boto3.session.Session()
     
@@ -41,15 +41,32 @@ def run_named_query_with_sql(source, queryname, params={}):
         
     named_query = named_queries[f"{queryname}_{source}"]
     
-    return run_query(named_query['QueryString'], named_query['Database'], named_query['WorkGroup'], params)
+    return run_query_sql_params(named_query['QueryString'], named_query['Database'], named_query['WorkGroup'], params)
+
+def run_named_query_with_sql(source, queryname, params={}):
+    df, sql, params = run_named_query_with_sql_params(source,queryname, params)
+    return [df, sql]
 
 def run_named_query(source, queryname, params={}):
-    df, sql = run_named_query_with_sql(source,queryname, params)
+    df, sql, params = run_named_query_with_sql_params(source,queryname, params)
     return df
 
+
+def run_query_sql(query_string, database="", workgroup="", params={}):
+    df, sql, params =  run_query_sql_params(query_string, database, workgroup, params)
+    
+    return [df, sql]
+
 def run_query(query_string, database="", workgroup="", params={}):
+    df, sql, params =  run_query_sql_params(query_string, database, workgroup, params)
+    
+    return df
+
+def run_query_sql_params(query_string, database="", workgroup="", params={}):
     session = boto3.session.Session()
     athena_client = session.client('athena')
+    
+    param_array = []
     
     if not "region" in params:
         params["region"] = session.region_name
@@ -59,6 +76,28 @@ def run_query(query_string, database="", workgroup="", params={}):
         params["accountid"] = sts_client.get_caller_identity()["Account"]
         
     sql = query_string.format(**params)
+    
+    sql_lines = sql.split('\n')
+    
+    for line in sql_lines:
+        if line.startswith('-- PARAM'):
+            parameter_info = line[9:].split(' ')
+            paramvalue = params[parameter_info[0]]
+            
+            format_string = ""
+            
+            if len(parameter_info) > 1:
+                format_string = "{" + parameter_info[0] + ":" + parameter_info[1] + "}"
+            else:
+                format_string = "{" + parameter_info[0] + "}"
+            
+            if not (type(paramvalue) == int or type(paramvalue) == float):
+                format_string = "'" + format_string + "'"
+
+            paramvalue = format_string.format(**params)
+            param_array.append(paramvalue)
+            
+    
     
     timeout_seconds = QUERY_TIMEOUT
 
@@ -87,6 +126,8 @@ def run_query(query_string, database="", workgroup="", params={}):
     if workgroup != "":
         start_execution_params["WorkGroup"] = workgroup
     
+    if len(param_array) > 0:
+        start_execution_params['ExecutionParameters'] = param_array
     
     response = athena_client.start_query_execution(**start_execution_params)
     query_execution_id = response['QueryExecutionId']
@@ -121,7 +162,9 @@ def run_query(query_string, database="", workgroup="", params={}):
                     item[column['Name']] = row['Data'][i].get('VarCharValue', '')
                     i += 1
                 results.append(item)
-
+    else:
+        error_info = response['QueryExecution']['Status']['AthenaError']
+        raise Exception(error_info['ErrorMessage'])
 
     df = pd.DataFrame.from_dict(results)
-    return [df, sql]
+    return [df, sql, param_array]
